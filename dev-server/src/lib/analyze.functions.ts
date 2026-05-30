@@ -59,12 +59,14 @@ async function runRealAnalysis(
 
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    console.warn("YouTube API: YOUTUBE_API_KEY is not defined. Active fallback demo mode.");
-    return null;
+    throw new Error("Live YouTube API failed: YOUTUBE_API_KEY is not defined in environment variables.");
   }
-  console.log(`[DEBUG] LIVE API ANALYSIS INITIATED for username/query: "${username}" on platform: "${platform || 'youtube'}"`);
+  
+  const input = username;
+  console.log("RAW INPUT:", input);
+
   try {
-    const { resolveChannel, getChannelSignals, getRecentComments, searchChannelCandidates } = await import(
+    const { resolveChannel, getChannelSignals, getRecentComments, searchChannelCandidates, normalizeHandle } = await import(
       "./services/youtube.server"
     );
     const { computeScore, trustLabel, inferCreatorCategories } = await import("./services/scoring");
@@ -72,13 +74,14 @@ async function runRealAnalysis(
     const { analyzeCommentsAI, generateAiTrustAnalysis, normalizeInputAI, matchCreatorCandidatesAI } = await import("./services/gemini.server");
 
     // 1. Creator Identity Resolution Flow
-    let resolvedUsername = username.trim();
+    const rawInput = username.trim();
+    let resolvedUsername = normalizeHandle(rawInput);
     let meta: any = null;
     let directLookupSucceeded = false;
 
-    // Check if it is a direct channel ID or looks like a handle (starts with @ or is a single word without spaces)
+    // Check if it is a direct channel ID or looks like a handle (starts with @, contains no spaces, or has domain keywords)
     const isDirectChannelId = /^UC[a-zA-Z0-9_-]{22}$/.test(resolvedUsername);
-    const looksLikeHandle = resolvedUsername.startsWith("@") || (!resolvedUsername.includes(" ") && resolvedUsername.length > 0);
+    const looksLikeHandle = isDirectChannelId || rawInput.startsWith("@") || !rawInput.includes(" ") || rawInput.includes("youtube.com/");
 
     if (isDirectChannelId || looksLikeHandle) {
       try {
@@ -135,9 +138,13 @@ async function runRealAnalysis(
         throw new Error("No matching creator/channel found.");
       }
     }
+
+    const selectedChannel = meta;
+    console.log("SELECTED CHANNEL:", selectedChannel);
+
     console.log("LIVE CHANNEL DATA", meta);
     console.log("VIDEO COUNT", meta.totalVideos);
-    const titleSeed = [...meta.title.toLowerCase().replace(/[^a-z0-9]/g, "")].reduce((a, c) => a + c.charCodeAt(0), 0) || 42;
+    const titleSeed = [...meta.title.toLowerCase().replace(/[^a-z0-9_\-\.]/g, "")].reduce((a, c) => a + c.charCodeAt(0), 0) || 42;
 
     // 2. Fetch Channel Signals
     const raw = await getChannelSignals(meta, apiKey);
@@ -382,12 +389,8 @@ async function runRealAnalysis(
       ]
     };
   } catch (e: any) {
-    // If the creator validation failed or was not found, propagate the error directly
-    if (e.message === "No matching creator/channel found.") {
-      throw e;
-    }
-    console.error("[DEBUG] LIVE API ANALYSIS ENCOUNTERED ERROR. FALLING BACK TO DEMO MODE.", e);
-    return null;
+    console.error("[DEBUG] LIVE API ANALYSIS ENCOUNTERED ERROR:", e);
+    throw e;
   }
 }
 
@@ -399,12 +402,23 @@ export const analyzeInfluencer = createServerFn({ method: "POST" })
     }).parse(data)
   )
   .handler(async ({ data }) => {
-    const real = await runRealAnalysis(data.username, data.platform);
-    if (real) {
-      console.log("FALLBACK ACTIVE", false);
-      return real;
+    const isYouTube = data.platform === "youtube" || !data.platform;
+    try {
+      const real = await runRealAnalysis(data.username, data.platform);
+      if (real) {
+        console.log("FALLBACK ACTIVE", false);
+        return real;
+      }
+      if (isYouTube) {
+        throw new Error("YouTube API returned empty analysis.");
+      }
+    } catch (e: any) {
+      if (isYouTube) {
+        console.error("[DEBUG] Live YouTube API failed during resolution:", e);
+        throw new Error(`Live YouTube API failed: ${e.message}`);
+      }
     }
-    console.log("FALLBACK ACTIVE", true);
+
     if (data.platform === "instagram" || data.platform === "twitter") {
       const { generatePlatformFallbackAnalysis } = await import("./services/gemini.server");
       return await generatePlatformFallbackAnalysis(data.username, data.platform);
@@ -417,15 +431,19 @@ export const compareInfluencers = createServerFn({ method: "POST" })
     z.object({ a: z.string().min(1).max(80), b: z.string().min(1).max(80) }).parse(data)
   )
   .handler(async ({ data }) => {
-    const [aRes, bRes] = await Promise.all([
-      runRealAnalysis(data.a),
-      runRealAnalysis(data.b),
-    ]);
-    const a = aRes ?? { ...analyzeMock(data.a), dataSource: "fallback" as const };
-    const b = bRes ?? { ...analyzeMock(data.b), dataSource: "fallback" as const };
+    try {
+      const [aRes, bRes] = await Promise.all([
+        runRealAnalysis(data.a),
+        runRealAnalysis(data.b),
+      ]);
 
-    let recommendation = "";
-    if (aRes && bRes) {
+      if (!aRes) throw new Error(`Live YouTube API failed to resolve creator: "${data.a}"`);
+      if (!bRes) throw new Error(`Live YouTube API failed to resolve creator: "${data.b}"`);
+
+      const a = aRes;
+      const b = bRes;
+
+      let recommendation = "";
       try {
         const { generateComparison } = await import("./services/gemini.server");
         recommendation = await generateComparison(
@@ -449,6 +467,9 @@ export const compareInfluencers = createServerFn({ method: "POST" })
       } catch (e) {
         console.warn("compare AI failed:", e);
       }
+      return { a, b, recommendation };
+    } catch (e: any) {
+      console.error("[Compare] Live YouTube API failed during comparison:", e);
+      throw new Error(`Live YouTube API failed: ${e.message}`);
     }
-    return { a, b, recommendation };
   });
