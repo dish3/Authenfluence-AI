@@ -359,7 +359,7 @@ function AnalyzePage() {
             })}
             {data.map((d, i) => {
               const pt = getLabelPoint(i);
-              let textAnchor = "middle";
+              let textAnchor: "start" | "middle" | "end" = "middle";
               let dy = "0.33em";
               if (pt.x < center - 10) textAnchor = "end";
               else if (pt.x > center + 10) textAnchor = "start";
@@ -2286,9 +2286,8 @@ function AnalyzePage() {
       </AnimatePresence>
     </div>
   );
-}
 
-  const renderDisambiguationView = () => {
+  function renderDisambiguationView() {
     if (!disambiguationData) return null;
 
     const confidenceColors = {
@@ -2311,7 +2310,7 @@ function AnalyzePage() {
         </div>
 
         <div className="space-y-3">
-          {disambiguationData.candidates.map((candidate) => (
+          {disambiguationData.candidates.map((candidate: any) => (
             <div
               key={candidate.channelId}
               onClick={() => run(candidate.channelId, disambiguationData.platform)}
@@ -2382,3 +2381,4 @@ function AnalyzePage() {
       </div>
     );
   };
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Download, Youtube, Sparkles, Users, Heart, FileText, GitCompare, FlaskConical, ShieldCheck, TrendingUp, TrendingDown, Minus, Info, AlertCircle, BadgeCheck, AlertTriangle, Check, ExternalLink, Globe, Instagram, Twitter, Linkedin, Activity, Target, Award, Cpu, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,8 +45,19 @@ function TrendIcon({ trend }: { trend: string }) {
   return <Info className="w-3.5 h-3.5 text-muted-foreground" />;
 }
 
+const isValidAvatar = (url?: string | null) => {
+  return typeof url === "string" && url.trim().length > 0 && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("//"));
+};
+
 export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [analysis.username, analysis.avatarUrl]);
+
   const label = scoreLabel(analysis.score);
   const hasTemporalData = analysis.temporalSignals &&
     analysis.temporalSignals.uploadTrend !== "insufficient_data";
@@ -119,24 +130,31 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
               )}
             </div>
             <div className="flex items-center gap-4 mb-4 mt-2">
-              {analysis.avatarUrl && !imageError ? (
-                <img
-                  src={analysis.avatarUrl.startsWith("//") ? `https:${analysis.avatarUrl}` : analysis.avatarUrl}
-                  alt={analysis.displayName}
-                  referrerPolicy="no-referrer"
-                  onError={() => setImageError(true)}
-                  className="w-16 h-16 rounded-full object-cover border-2 border-border/40 shadow-md shrink-0"
-                />
-              ) : (
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-r ${analysis.avatarColor || 'from-blue-500 to-purple-500'} flex items-center justify-center text-white text-xl font-bold shadow-md shrink-0`}>
+              <div className="relative w-16 h-16 rounded-full overflow-hidden aspect-square border-2 border-border/40 shadow-md shrink-0 flex items-center justify-center">
+                {/* Fallback avatar background gradient */}
+                <div className={`absolute inset-0 bg-gradient-to-r ${analysis.avatarColor || 'from-blue-500 to-purple-500'} flex items-center justify-center text-white text-xl font-bold`}>
                   {analysis.displayName.charAt(0)}
                 </div>
-              )}
+                {isValidAvatar(analysis.avatarUrl) && !imageError && (
+                  <img
+                    src={analysis.avatarUrl.startsWith("//") ? `https:${analysis.avatarUrl}` : analysis.avatarUrl}
+                    alt={analysis.displayName}
+                    referrerPolicy="no-referrer"
+                    onLoad={() => setImageLoaded(true)}
+                    onError={() => setImageError(true)}
+                    className={`absolute inset-0 w-full h-full object-cover rounded-full transition-opacity duration-300 ${
+                      imageLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                )}
+              </div>
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight flex items-center gap-1.5 flex-wrap">
                   {analysis.displayName}
                   {analysis.isVerified && (
-                    <BadgeCheck className="w-5.5 h-5.5 text-blue-500 fill-blue-500/10 shrink-0 animate-fade-in" title="Verified Creator" />
+                    <span title="Verified Creator">
+                      <BadgeCheck className="w-5.5 h-5.5 text-blue-500 fill-blue-500/10 shrink-0 animate-fade-in" />
+                    </span>
                   )}
                 </h1>
                 <p className="text-muted-foreground mt-0.5">@{analysis.username}</p>
@@ -849,7 +867,9 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
                           <div className="text-sm font-semibold flex items-center gap-1.5">
                             {social.platform}
                             {social.isVerified && (
-                              <BadgeCheck className="w-4 h-4 text-blue-500 fill-blue-500/10 shrink-0" title="Verified source profile" />
+                              <span title="Verified source profile">
+                                <BadgeCheck className="w-4 h-4 text-blue-500 fill-blue-500/10 shrink-0" />
+                              </span>
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">{social.handle}</div>

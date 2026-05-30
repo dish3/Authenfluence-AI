@@ -982,7 +982,7 @@ Format the output as raw JSON matching the requested schema. Ensure all fields a
       creatorCategories: [{ type: "Entertainment", weight: 0.8 }, { type: "Lifestyle", weight: 0.2 }],
       verdict: `This is an AI-researched public profile for @${cleanUsername} on ${platform.toUpperCase()}. Estimated engagement shows stable consistency with moderate bot and automation patterns. Suitable for standard brand sponsorships with typical audience metrics.`,
       breakdown: { engagement: 78, followerQuality: 74, commentAuthenticity: 72, postingConsistency: 80 },
-      fraudSignals: [{ name: "Comment Bot Behavior", value: 24, status: "ok", details: "Average comment verification check." }],
+      fraudSignals: [{ id: "comment_bot", title: "Comment Bot Behavior", description: "Average comment verification check.", severity: "low" }],
       engagementSeries: generateDummySeries(18500),
       strengths: ["Consistent content cadence", "Stable baseline comment sentiment"],
       risks: ["Limited platform analytics transparency"],
