@@ -306,6 +306,16 @@ export interface AiTrustAnalysisResult {
   verdict: string;
   strengths: string[];
   risks: string[];
+  timelineEvents: any[];
+  brandRecommendation: any;
+  commentAuthenticity: any;
+  verifiedSocials: any[];
+  growthPotentialScore: number;
+  growthPotentialExplanation: string;
+  campaignSuccessProbability: number;
+  brandMatches: Array<{ brandName: string; score: number; reason: string }>;
+  businessImpact: { conversionPotential: string; suitability: string; stability: string; loyalty: string };
+  whyThisScore: { positive: string[]; monitoring: string[] };
 }
 
 export async function generateAiTrustAnalysis(args: {
@@ -434,9 +444,57 @@ export async function generateAiTrustAnalysis(args: {
           required: ["platform", "url", "handle", "isVerified"]
         },
         description: "Array of social profiles and handles for the creator."
+      },
+      growthPotentialScore: {
+        type: "number",
+        description: "Growth potential score from 0 to 100 predicting future expansion potential."
+      },
+      growthPotentialExplanation: {
+        type: "string",
+        description: "2-3 sentence AI explanation detailing creator growth trajectory and audience expansion outlook."
+      },
+      campaignSuccessProbability: {
+        type: "number",
+        description: "Estimated percentage probability (0-100) that a brand campaign will succeed with this creator."
+      },
+      brandMatches: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            brandName: { type: "string", description: "Name of matching brand (e.g. Nike, Spotify, Adobe, Razer, Discord, NordVPN)." },
+            score: { type: "number", description: "Match score 0-100." },
+            reason: { type: "string", description: "One-sentence AI matching rationale." }
+          },
+          required: ["brandName", "score", "reason"]
+        },
+        description: "List of 3 best-suited brands for partnership."
+      },
+      businessImpact: {
+        type: "object",
+        properties: {
+          conversionPotential: { type: "string", description: "High, Medium, or Low." },
+          suitability: { type: "string", description: "One sentence on campaign suitability." },
+          stability: { type: "string", description: "One sentence on channel stability." },
+          loyalty: { type: "string", description: "One sentence on audience loyalty." }
+        },
+        required: ["conversionPotential", "suitability", "stability", "loyalty"]
+      },
+      whyThisScore: {
+        type: "object",
+        properties: {
+          positive: { type: "array", items: { type: "string" }, description: "3-4 bulleted positive signals." },
+          monitoring: { type: "array", items: { type: "string" }, description: "2-3 areas worth monitoring." }
+        },
+        required: ["positive", "monitoring"]
       }
     },
-    required: ["trustScore", "riskLevel", "primaryCategory", "secondaryCategory", "verdict", "strengths", "risks", "timelineEvents", "brandRecommendation", "commentAuthenticity", "verifiedSocials"]
+    required: [
+      "trustScore", "riskLevel", "primaryCategory", "secondaryCategory", "verdict", "strengths", "risks", 
+      "timelineEvents", "brandRecommendation", "commentAuthenticity", "verifiedSocials",
+      "growthPotentialScore", "growthPotentialExplanation", "campaignSuccessProbability", 
+      "brandMatches", "businessImpact", "whyThisScore"
+    ]
   };
 
   const responseText = await callGemini({
@@ -451,7 +509,10 @@ CRITICAL RULES — you MUST follow these:
 6. Generate 5-6 timeline events covering growth consistency, audience authenticity, suspicious activity spikes, upload cadence, and engagement quality.
 7. Provide a detailed brand recommendation highlighting safety, sponsorship suitability, and risk level.
 8. Break down comment authenticity into realistic estimates for spam, repetitive, emoji spam, bot language, and organic comments.
-9. Populate verifiedSocials with highly realistic links based on the creator's username (e.g. for MrBeast, youtube.com/@mrbeast, instagram.com/mrbeast, x.com/mrbeast, tiktok.com/@mrbeast, mrbeast.store). Mark as verified.`,
+9. Populate verifiedSocials with highly realistic links based on the creator's username (e.g. for MrBeast, youtube.com/@mrbeast, instagram.com/mrbeast, x.com/mrbeast, tiktok.com/@mrbeast, mrbeast.store). Mark as verified.
+10. Calculate Growth Potential Score (0-100) and Campaign Success Probability (0-100) logically, correlating them with comment authenticity, audience trust, and upload consistency.
+11. Recommend the 3 best brand matches with matching scores and specific reasons based on the content niche.
+12. Summarize the business impact (conversion, stability, loyalty) and transparently detail positive vs monitoring signals.`,
     prompt: JSON.stringify(groundedData),
     jsonSchema: schema
   });
@@ -484,11 +545,30 @@ CRITICAL RULES — you MUST follow these:
         organicPct: 65
       },
       verifiedSocials: Array.isArray(parsed.verifiedSocials) ? parsed.verifiedSocials : [],
+      growthPotentialScore: Number(parsed.growthPotentialScore) || Math.round(score.finalScore * 0.8),
+      growthPotentialExplanation: String(parsed.growthPotentialExplanation || "Stable creator momentum suggesting future growth."),
+      campaignSuccessProbability: Number(parsed.campaignSuccessProbability) || Math.round(score.finalScore * 0.9),
+      brandMatches: Array.isArray(parsed.brandMatches) ? parsed.brandMatches : [
+        { brandName: "Nike", score: Math.round(score.finalScore * 0.92), reason: "Strong alignment with general lifestyle demographics." },
+        { brandName: "Spotify", score: Math.round(score.finalScore * 0.88), reason: "Great overlap with streaming audio consumers." },
+        { brandName: "Adobe", score: Math.round(score.finalScore * 0.84), reason: "Ideal fit for creative audience bases." }
+      ],
+      businessImpact: parsed.businessImpact || {
+        conversionPotential: score.finalScore >= 70 ? "High" : "Medium",
+        suitability: "Suitable for campaign testing.",
+        stability: "Average posting consistency.",
+        loyalty: "Standard audience retention rates."
+      },
+      whyThisScore: parsed.whyThisScore || {
+        positive: ["Good subscriber scale", "Established channel presence"],
+        monitoring: ["Audience quality verification recommended"]
+      }
     };
   } catch (e) {
     console.error("[Gemini] AI trust analysis parse failed, using fallback:", e, responseText);
     const fallbackScore = score.finalScore;
     const isHigh = fallbackScore >= 70;
+    const organicPct = 100 - Math.round(comments.botRatio * 100);
     return {
       trustScore: fallbackScore,
       riskLevel: isHigh ? "Low" : fallbackScore >= 50 ? "Medium" : "High",
@@ -514,13 +594,32 @@ CRITICAL RULES — you MUST follow these:
         repetitivePct: Math.round(comments.botRatio * 40),
         emojiSpamPct: Math.round(comments.botRatio * 20),
         botLanguagePct: Math.round(comments.botRatio * 10),
-        organicPct: 100 - Math.round(comments.botRatio * 100)
+        organicPct: organicPct
       },
       verifiedSocials: [
         { platform: "YouTube", url: `https://youtube.com/@${args.displayName.toLowerCase().replace(/\s/g, "")}`, handle: `@${args.displayName.toLowerCase().replace(/\s/g, "")}`, isVerified: true }
-      ]
+      ],
+      growthPotentialScore: Math.round(fallbackScore * 0.8),
+      growthPotentialExplanation: "Stable creator momentum suggesting future growth within the category.",
+      campaignSuccessProbability: Math.round(fallbackScore * 0.9),
+      brandMatches: [
+        { brandName: "Nike", score: Math.round(fallbackScore * 0.92), reason: "Strong alignment with general lifestyle demographics." },
+        { brandName: "Spotify", score: Math.round(fallbackScore * 0.88), reason: "Great overlap with streaming audio consumers." },
+        { brandName: "Adobe", score: Math.round(fallbackScore * 0.84), reason: "Ideal fit for creative audience bases." }
+      ],
+      businessImpact: {
+        conversionPotential: isHigh ? "High" : "Medium",
+        suitability: isHigh ? "Highly suitable for sponsorship campaigns." : "Suitable for performance-based marketing.",
+        stability: "Stable posting consistency.",
+        loyalty: "Healthy audience retention rates."
+      },
+      whyThisScore: {
+        positive: isHigh ? ["Good subscriber scale", "Established channel presence", "High comment authenticity"] : ["Established channel page"],
+        monitoring: isHigh ? ["Standard category benchmark limitations"] : ["Standard audience quality check recommended"]
+      }
     };
   }
+}
 }
 
 // ─── Comparison generation ────────────────────────────────────────────────────

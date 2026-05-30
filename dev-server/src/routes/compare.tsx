@@ -137,6 +137,67 @@ function ComparePage() {
           </div>
         )}
 
+        {pair && (
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-3xl p-6 sm:p-8 border border-border/40 space-y-4"
+          >
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" /> Multi-Dimensional Predictive Match Matrix
+            </h3>
+            <p className="text-xs text-muted-foreground">Detailed comparative vectors evaluated by Authenfluence AI models</p>
+
+            <div className="space-y-4 pt-2">
+              {[
+                { name: "Overall Trust Score", key: "score", format: (v: number) => `${v}/100`, max: 100 },
+                { name: "Growth Potential Score", key: "growthPotentialScore", format: (v: number) => `${v}/100`, max: 100 },
+                { name: "Campaign Success Probability", key: "campaignSuccessProbability", format: (v: number) => `${v}%`, max: 100 },
+                { name: "Comment Authenticity (Organic %)", key: "commentAuthenticityDetailed", format: (v: any) => `${v.organicPct}%`, valExtractor: (v: any) => v.commentAuthenticityDetailed?.organicPct || 75, max: 100 },
+                { name: "Posting Consistency", key: "breakdown", format: (v: any) => `${v.postingConsistency}/100`, valExtractor: (v: any) => v.breakdown?.postingConsistency || 80, max: 100 },
+              ].map((row) => {
+                const valA = row.valExtractor ? row.valExtractor(pair.a) : (pair.a as any)[row.key];
+                const valB = row.valExtractor ? row.valExtractor(pair.b) : (pair.b as any)[row.key];
+                const labelA = row.format(row.valExtractor ? pair.a : (pair.a as any)[row.key]);
+                const labelB = row.format(row.valExtractor ? pair.b : (pair.b as any)[row.key]);
+
+                return (
+                  <div key={row.name} className="grid grid-cols-[1fr_2fr_1fr] gap-4 items-center border-b border-border/20 pb-3 last:border-b-0 last:pb-0 font-normal">
+                    <div className="text-xs font-semibold text-right text-foreground/80 pr-2">
+                      <div className="font-medium text-muted-foreground text-[10px] uppercase">Creator A</div>
+                      <div className="text-sm font-bold text-primary">{labelA}</div>
+                    </div>
+
+                    <div className="space-y-1.5 text-center">
+                      <div className="text-xs font-semibold text-foreground/90">{row.name}</div>
+                      <div className="flex gap-2 items-center justify-center">
+                        <div className="flex-1 bg-muted/30 rounded-full h-2 overflow-hidden flex justify-end">
+                          <div 
+                            className="bg-primary h-full rounded-l-full"
+                            style={{ width: `${(valA / row.max) * 100}%` }}
+                          />
+                        </div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-border" />
+                        <div className="flex-1 bg-muted/30 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="bg-purple-500 h-full rounded-r-full"
+                            style={{ width: `${(valB / row.max) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-xs font-semibold text-left text-foreground/80 pl-2">
+                      <div className="font-medium text-muted-foreground text-[10px] uppercase">Creator B</div>
+                      <div className="text-sm font-bold text-purple-400">{labelB}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
         {pair && winner !== null && (
           <motion.div
             initial={{ opacity: 0, y: 14 }}

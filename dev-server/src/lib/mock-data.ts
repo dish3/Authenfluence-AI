@@ -103,6 +103,16 @@ export interface InfluencerAnalysis {
   brandRecommendation?: BrandRecommendation;
   commentAuthenticityDetailed?: DetailedCommentAuthenticity;
   mediaPresence?: VerifiedSocial[];
+
+  // ML & business intelligence extension fields
+  growthPotentialScore?: number;
+  growthPotentialExplanation?: string;
+  campaignSuccessProbability?: number;
+  brandMatches?: Array<{ brandName: string; score: number; reason: string }>;
+  featureAnalysis?: Array<{ name: string; weight: number; status: "strong" | "moderate" | "warning"; value: string }>;
+  momentumSignals?: { thirtyDayGrowth: number; engagementTrajectory: "up" | "stable" | "down"; velocityScore: number; signals: string[] };
+  businessImpact?: { conversionPotential: string; suitability: string; stability: string; loyalty: string };
+  whyThisScore?: { positive: string[]; monitoring: string[] };
 }
 
 const series = (base: number, vol: number) =>
@@ -505,16 +515,27 @@ export const MOCK_INFLUENCERS: Record<string, InfluencerAnalysis> = {
 
 export function analyzeMock(username: string): InfluencerAnalysis {
   const key = username.toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (MOCK_INFLUENCERS[key]) return MOCK_INFLUENCERS[key];
+  
+  // Detemine if we have a calibrated mock profile
+  const isPredefined = !!MOCK_INFLUENCERS[key];
+  const baseObj = isPredefined ? MOCK_INFLUENCERS[key] : {} as any;
 
-  // Deterministic pseudo-analysis for unknown usernames
+  // Deterministic seed calculations
   const seed = [...key].reduce((a, c) => a + c.charCodeAt(0), 0) || 42;
-  const score = 35 + (seed % 55);
-  const wiggle = (n: number) => Math.max(10, Math.min(98, score + ((seed * n) % 15) - 7));
+  const score = isPredefined ? baseObj.score : 35 + (seed % 55);
+  
+  const wiggle = (n: number) => {
+    if (isPredefined && baseObj.breakdown) {
+      const keys = Object.keys(baseObj.breakdown);
+      const val = (baseObj.breakdown as any)[keys[n - 1]];
+      if (val !== undefined) return val;
+    }
+    return Math.max(10, Math.min(98, score + ((seed * n) % 15) - 7));
+  };
 
-  const followers = 50_000 + (seed * 137) % 900_000;
-  const avgLikes = 1_000 + (seed * 53) % 30_000;
-  const engRate = ((avgLikes / Math.max(1, followers)) * 100);
+  const followers = isPredefined ? baseObj.followers : 50_000 + (seed * 137) % 900_000;
+  const avgLikes = isPredefined ? baseObj.avgLikes : 1_000 + (seed * 53) % 30_000;
+  const engRate = isPredefined ? (baseObj.engagementRate || 1.5) : ((avgLikes / Math.max(1, followers)) * 100);
 
   // Infer tier for benchmark context
   const tier =
@@ -528,19 +549,22 @@ export function analyzeMock(username: string): InfluencerAnalysis {
   };
   const engTarget = tierBenchmarks[tier];
 
-  const confidenceLevel: ConfidenceLevel = score >= 60 ? "Medium" : score >= 40 ? "Medium" : "Low";
+  const confidenceLevel: ConfidenceLevel = isPredefined ? (baseObj.confidenceLevel || "Medium") : (score >= 60 ? "Medium" : score >= 40 ? "Medium" : "Low");
 
   const isHigh = score >= 70;
   const isMed = score >= 45 && score < 70;
   
-  const lowAuthenticityPct = isHigh ? Math.round(10 - (score - 70) * 0.2) : isMed ? Math.round(25 - (score - 45) * 0.4) : Math.round(75 - (score * 0.8));
+  const lowAuthenticityPct = isPredefined && baseObj.commentAuthenticityDetailed 
+    ? baseObj.commentAuthenticityDetailed.lowAuthenticityPct 
+    : (isHigh ? Math.round(10 - (score - 70) * 0.2) : isMed ? Math.round(25 - (score - 45) * 0.4) : Math.round(75 - (score * 0.8)));
+  
   const spamPct = Math.round(lowAuthenticityPct * 0.2);
   const repetitivePct = Math.round(lowAuthenticityPct * 0.4);
   const emojiSpamPct = Math.round(lowAuthenticityPct * 0.3);
   const botLanguagePct = Math.round(lowAuthenticityPct * 0.1);
   const organicPct = 100 - lowAuthenticityPct;
 
-  const timelineEvents = [
+  const timelineEvents = isPredefined && baseObj.timelineEvents ? baseObj.timelineEvents : [
     {
       status: isHigh ? ("success" as const) : isMed ? ("info" as const) : ("warning" as const),
       category: "audience" as const,
@@ -564,7 +588,7 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     }
   ];
 
-  const brandRecommendation = {
+  const brandRecommendation = isPredefined && baseObj.brandRecommendation ? baseObj.brandRecommendation : {
     riskLevel: isHigh ? ("Low" as const) : isMed ? ("Medium" as const) : ("Critical" as const),
     sponsorshipSuitability: isHigh 
       ? "Highly suitable for long-term sponsorships and premium brand integrations." 
@@ -583,7 +607,7 @@ export function analyzeMock(username: string): InfluencerAnalysis {
         : "Severe comment repetition (estimated low authenticity of " + lowAuthenticityPct + "%) suggests simulated engagement."
   };
 
-  const commentAuthenticityDetailed = {
+  const commentAuthenticityDetailed = isPredefined && baseObj.commentAuthenticityDetailed ? baseObj.commentAuthenticityDetailed : {
     lowAuthenticityPct,
     reason: isHigh 
       ? "Comments represent genuine conversations and contextually relevant opinions." 
@@ -597,22 +621,107 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     organicPct
   };
 
-  const mediaPresence = [
+  const mediaPresence = isPredefined && baseObj.mediaPresence ? baseObj.mediaPresence : [
     { platform: "YouTube", url: `https://youtube.com/@${key}`, handle: `@${key}`, isVerified: isHigh },
     { platform: "Instagram", url: `https://instagram.com/${key}`, handle: `@${key}`, isVerified: isHigh && followers > 200000 },
     { platform: "Twitter/X", url: `https://x.com/${key}`, handle: `@${key}`, isVerified: false }
   ];
 
+  // Dynamic ML-scoring & Campaign Success Metrics (Phase 1, 2, 3, 4, 5, 6, 8)
+  const growthPotentialScore = Math.max(15, Math.min(98, Math.round(score * 0.8 + (seed % 15) + (followers > 500_000 ? 5 : 0))));
+  const growthPotentialExplanation = score >= 75
+    ? `This creator demonstrates stable audience momentum and healthy interaction consistency, suggesting strong future growth potential within the entertainment ecosystem.`
+    : score >= 45
+      ? `This creator demonstrates moderate audience momentum. While posting volume is stable, engagement fluctuations and bot comment noise could slow expansion.`
+      : `This creator demonstrates weak growth potential. High synthetic engagement patterns and audience quality warnings indicate low organic reach.`;
+
+  const campaignSuccessProbability = Math.max(10, Math.min(99, Math.round(score * 0.9 + (seed % 10))));
+
+  const creatorCategories = isPredefined && baseObj.creatorCategories ? baseObj.creatorCategories : [{ type: "Entertainment", weight: 0.6 }, { type: "Lifestyle", weight: 0.4 }];
+  const mainCategory = creatorCategories[0]?.type || "Entertainment";
+
+  const getBrandMatchesForCategory = (cat: string) => {
+    switch (cat.toLowerCase()) {
+      case "music":
+        return [
+          { brandName: "Spotify", score: Math.round(score * 0.95), reason: "Excellent alignment with active music listeners and streaming audiences." },
+          { brandName: "Sony Audio", score: Math.round(score * 0.88), reason: "Premium relevance for audio quality appreciation." },
+          { brandName: "Fender", score: Math.round(score * 0.82), reason: "Strong connection to music makers and creators." }
+        ];
+      case "gaming":
+        return [
+          { brandName: "Razer", score: Math.round(score * 0.96), reason: "High alignment with gaming setup enthusiasts." },
+          { brandName: "Discord", score: Math.round(score * 0.91), reason: "Perfect match for community-focused gaming groups." },
+          { brandName: "Epic Games", score: Math.round(score * 0.85), reason: "Direct overlap with popular gaming cultural trends." }
+        ];
+      case "tech":
+      case "technology":
+      case "news":
+        return [
+          { brandName: "NordVPN", score: Math.round(score * 0.94), reason: "Highly relevant to tech-literate and privacy-focused audiences." },
+          { brandName: "Adobe", score: Math.round(score * 0.89), reason: "Excellent alignment with creator workflow applications." },
+          { brandName: "Logitech", score: Math.round(score * 0.85), reason: "Solid overlap with digital production setups." }
+        ];
+      default:
+        return [
+          { brandName: "Nike", score: Math.round(score * 0.92), reason: "Strong alignment with lifestyle and entertainment-focused Gen Z audiences." },
+          { brandName: "Spotify", score: Math.round(score * 0.88), reason: "Excellent overlap with music and pop-culture enthusiasts." },
+          { brandName: "Adobe", score: Math.round(score * 0.84), reason: "Perfect fit for creative lifestyle, photography, and video makers." }
+        ];
+    }
+  };
+  const brandMatches = getBrandMatchesForCategory(mainCategory);
+
+  const featureAnalysis = [
+    { name: "Influence Reliability", weight: 24, status: score >= 70 ? ("strong" as const) : score >= 50 ? ("moderate" as const) : ("warning" as const), value: `${score}/100` },
+    { name: "Audience Trust Quality", weight: 20, status: score >= 70 ? ("strong" as const) : score >= 50 ? ("moderate" as const) : ("warning" as const), value: `${Math.round(score * 0.95)}/100` },
+    { name: "Comment Authenticity", weight: 18, status: score >= 70 ? ("strong" as const) : score >= 50 ? ("moderate" as const) : ("warning" as const), value: `${Math.round(organicPct)}%` },
+    { name: "Growth Stability", weight: 15, status: score >= 70 ? ("strong" as const) : score >= 50 ? ("moderate" as const) : ("warning" as const), value: score >= 70 ? "Stable" : "Volatile" },
+    { name: "Posting Consistency", weight: 13, status: score >= 70 ? ("strong" as const) : score >= 50 ? ("moderate" as const) : ("warning" as const), value: score >= 70 ? "High" : "Low" },
+    { name: "Creator Momentum", weight: 10, status: score >= 70 ? ("strong" as const) : score >= 50 ? ("moderate" as const) : ("warning" as const), value: score >= 70 ? "Upward" : "Stagnant" },
+  ];
+
+  const momentumSignals = {
+    thirtyDayGrowth: score >= 70 ? 4.8 : score >= 50 ? 1.2 : -0.5,
+    engagementTrajectory: score >= 70 ? ("up" as const) : score >= 50 ? ("stable" as const) : ("down" as const),
+    velocityScore: Math.round(score * 0.85),
+    signals: score >= 70
+      ? ["Consistent weekly uploads", "Organic comment velocity", "Stable audience expansion rate"]
+      : score >= 50
+        ? ["Slightly irregular posting", "Plateauing view counts", "Average interaction velocity"]
+        : ["Volatile upload gaps", "High repetitive comment spikes", "Negative audience trajectory"]
+  };
+
+  const businessImpact = {
+    conversionPotential: score >= 75 ? "High" : score >= 50 ? "Medium" : "Low",
+    suitability: score >= 75 ? "Highly suitable for premium integrations and product launches." : score >= 50 ? "Suitable for performance-based campaigns only." : "Not recommended due to high audience fraud signals.",
+    stability: score >= 70 ? "Stable publishing cadence with predictable reach." : score >= 45 ? "Moderate volatility in engagement levels." : "High risk of channel stagnation or audience decay.",
+    loyalty: score >= 75 ? "Very high conversational loyalty with low bot noise." : score >= 50 ? "Average viewer retention with typical spam ratios." : "Weak audience relationship, dominated by automated chatter."
+  };
+
+  const whyThisScore = {
+    positive: score >= 70
+      ? ["Healthy audience trust indices", "Strong posting consistency", "Organic engagement distribution", "Stable creator momentum"]
+      : score >= 50
+        ? ["Consistent viewer baseline", "Good historical output volume"]
+        : ["Established legacy channel page"],
+    monitoring: score >= 70
+      ? ["Standard category audience growth limits"]
+      : score >= 50
+        ? ["Slightly elevated bot language ratios", "Plateauing subscriber velocity"]
+        : ["High spam/bot ratios in comment sections", "Volatile upload consistency", "Likes-to-views conversion mismatch"]
+  };
+
   return {
-    username: key || "unknown",
-    displayName: username || "Unknown Creator",
-    platform: "youtube",
-    avatarColor: "from-indigo-500 to-cyan-500",
+    username: isPredefined ? baseObj.username : (key || "unknown"),
+    displayName: isPredefined ? baseObj.displayName : (username || "Unknown Creator"),
+    platform: "youtube" as any,
+    avatarColor: isPredefined ? (baseObj.avatarColor || "from-indigo-500 to-cyan-500") : "from-indigo-500 to-cyan-500",
     followers,
     avgLikes,
-    totalPosts: 40 + (seed % 250),
+    totalPosts: isPredefined ? baseObj.totalPosts : 40 + (seed % 250),
     score,
-    isVerified: followers >= 1_000_000,
+    isVerified: isPredefined ? baseObj.isVerified : followers >= 1_000_000,
     breakdown: {
       engagement: wiggle(1),
       followerQuality: wiggle(2),
@@ -620,13 +729,13 @@ export function analyzeMock(username: string): InfluencerAnalysis {
       postingConsistency: wiggle(4),
       contextualSignals: wiggle(5),
     },
-    verdict:
+    verdict: isPredefined && baseObj.verdict ? baseObj.verdict :
       score >= 70
         ? `Based on available signals, this creator demonstrates predominantly organic engagement with healthy audience interaction and consistent posting behavior. Engagement rate of ${engRate.toFixed(2)}% is within the expected range for a ${tier}-tier creator (benchmark: ${engTarget}%). Trust signals are strong across most measured dimensions, though some data limitations apply as noted below.`
         : score >= 45
           ? `Based on available signals, this creator shows mixed authenticity indicators. Engagement rate of ${engRate.toFixed(2)}% is near the ${tier}-tier benchmark of ${engTarget}%, but several dimensions show inconsistencies that warrant monitoring. With medium confidence, this channel may be suitable for performance-tracked campaigns.`
           : `Based on available signals, this creator presents multiple concerning indicators. Engagement rate of ${engRate.toFixed(2)}% falls below the ${tier}-tier benchmark of ${engTarget}%, and audience quality signals are weak. With the available data, independent verification is recommended before brand partnership commitments.`,
-    fraudSignals:
+    fraudSignals: isPredefined && baseObj.fraudSignals ? baseObj.fraudSignals :
       score >= 70
         ? [{ id: "1", title: "Minor Engagement Variance", description: "Within acceptable range for this creator tier and content type.", severity: "low" }]
         : score >= 45
@@ -639,36 +748,45 @@ export function analyzeMock(username: string): InfluencerAnalysis {
               { id: "2", title: "Suspicious Activity in Comments", description: "Elevated proportion of comments showing automated or coordinated patterns.", severity: "high" },
               { id: "3", title: "Unusual Engagement Concentration", description: "Multiple engagement spikes inconsistent with organic content distribution.", severity: "medium" },
             ],
-    engagementSeries: series(Math.max(6, score / 3), Math.max(4, (100 - score) / 6)),
+    engagementSeries: isPredefined && baseObj.engagementSeries ? baseObj.engagementSeries : series(Math.max(6, score / 3), Math.max(4, (100 - score) / 6)),
     confidenceLevel,
-    uncertaintyFactors: ["Limited data — analysis based on publicly available signals only"],
-    creatorCategories: [{ type: "Entertainment", weight: 0.6 }, { type: "Lifestyle", weight: 0.4 }],
-    temporalSignals: {
+    uncertaintyFactors: isPredefined && baseObj.uncertaintyFactors ? baseObj.uncertaintyFactors : ["Limited data — analysis based on publicly available signals only"],
+    creatorCategories,
+    temporalSignals: isPredefined && baseObj.temporalSignals ? baseObj.temporalSignals : {
       uploadTrend: "insufficient_data",
       engagementTrend: "insufficient_data",
       suspiciousSpikesDetected: score < 40,
       suddenBehaviorChange: false,
       growthIrregularity: score < 45,
     },
-    publicCredibility: {
+    publicCredibility: isPredefined && baseObj.publicCredibility ? baseObj.publicCredibility : {
       score: Math.round(30 + (seed % 40)),
       reducesHarshPenalties: followers > 1_000_000,
       note: "Emerging to moderately established channel.",
     },
-    benchmarkContext: `Scored against ${tier}-tier creator benchmarks. Healthy engagement target: ${engTarget}% (estimated: ${engRate.toFixed(2)}%).`,
-    dataLimitations: [
+    benchmarkContext: isPredefined && baseObj.benchmarkContext ? baseObj.benchmarkContext : `Scored against ${tier}-tier creator benchmarks. Healthy engagement target: ${engTarget}% (estimated: ${engRate.toFixed(2)}%).`,
+    dataLimitations: isPredefined && baseObj.dataLimitations ? baseObj.dataLimitations : [
       "Audience demographic data is not publicly accessible via YouTube API.",
       "True follower authenticity cannot be directly verified — estimated from engagement patterns.",
       "Analysis based on publicly visible signals only — hidden analytics are not available.",
     ],
     engagementRate: engRate,
-    dataSource: "fallback",
+    dataSource: isPredefined ? (baseObj.dataSource || "fallback") : "fallback",
+    avatarUrl: isPredefined ? baseObj.avatarUrl : undefined,
     
-    // New fields
+    // New ML & prediction fields
     timelineEvents,
     brandRecommendation,
     commentAuthenticityDetailed,
-    mediaPresence
+    mediaPresence,
+    growthPotentialScore,
+    growthPotentialExplanation,
+    campaignSuccessProbability,
+    brandMatches,
+    featureAnalysis,
+    momentumSignals,
+    businessImpact,
+    whyThisScore
   };
 }
 

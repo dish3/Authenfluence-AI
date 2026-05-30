@@ -75,6 +75,21 @@ export function downloadReport(a: InfluencerAnalysis) {
     y += bcLines.length * 12 + 10;
   }
 
+  // Predictive Intelligence Metrics (Phase 1 & 2)
+  if (a.growthPotentialScore !== undefined && a.campaignSuccessProbability !== undefined) {
+    doc.setFontSize(13); doc.setTextColor(20);
+    doc.text("Predictive Intelligence Metrics", 40, y); y += 16;
+    doc.setFontSize(10); doc.setTextColor(60);
+    doc.text(`Estimated Campaign Success Probability: ${a.campaignSuccessProbability}%`, 40, y);
+    doc.text(`Estimated Growth Potential Score: ${a.growthPotentialScore}/100`, 320, y);
+    y += 16;
+    if (a.growthPotentialExplanation) {
+      const gpeLines = doc.splitTextToSize(`Growth Analysis: ${a.growthPotentialExplanation}`, W - 80);
+      doc.text(gpeLines, 40, y);
+      y += gpeLines.length * 12 + 10;
+    }
+  }
+
   // Breakdown
   doc.setFontSize(13); doc.setTextColor(20);
   doc.text("Score Breakdown", 40, y); y += 16;
@@ -182,6 +197,45 @@ export function downloadReport(a: InfluencerAnalysis) {
     doc.text(recReasonLines, 40, y);
     doc.setFont("helvetica", "normal");
     y += recReasonLines.length * 12 + 16;
+  }
+
+  // Brand Matches & Business Impact (Phase 3 & 6)
+  if (a.brandMatches && a.brandMatches.length > 0) {
+    if (y > 650) { doc.addPage(); y = 60; }
+    doc.setFontSize(13); doc.setTextColor(20);
+    doc.text("Semantic Brand Matching Recommendations", 40, y); y += 16;
+    a.brandMatches.forEach((match) => {
+      if (y > 750) { doc.addPage(); y = 60; }
+      doc.setFontSize(10); doc.setTextColor(80);
+      doc.text(`• ${match.brandName} (Match Score: ${match.score}%)`, 40, y);
+      doc.setFontSize(9); doc.setTextColor(110);
+      const mReasonLines = doc.splitTextToSize(`Rationale: ${match.reason}`, W - 60);
+      doc.text(mReasonLines, 50, y + 12);
+      y += 12 + mReasonLines.length * 11 + 6;
+    });
+    y += 10;
+  }
+
+  if (a.businessImpact) {
+    if (y > 650) { doc.addPage(); y = 60; }
+    doc.setFontSize(13); doc.setTextColor(20);
+    doc.text("Business Impact & Partnership Value", 40, y); y += 18;
+    doc.setFontSize(10); doc.setTextColor(80);
+    
+    doc.text("Conversion Potential:", 40, y);
+    doc.setTextColor(20); doc.text(a.businessImpact.conversionPotential, 170, y); y += 14;
+    
+    doc.setTextColor(80); doc.text("Campaign Suitability:", 40, y);
+    doc.setTextColor(20); const suitLines = doc.splitTextToSize(a.businessImpact.suitability, W - 210);
+    doc.text(suitLines, 170, y); y += suitLines.length * 12 + 4;
+    
+    doc.setTextColor(80); doc.text("Reach Stability:", 40, y);
+    doc.setTextColor(20); const stabLines = doc.splitTextToSize(a.businessImpact.stability, W - 210);
+    doc.text(stabLines, 170, y); y += stabLines.length * 12 + 4;
+    
+    doc.setTextColor(80); doc.text("Audience Loyalty:", 40, y);
+    doc.setTextColor(20); const loyLines = doc.splitTextToSize(a.businessImpact.loyalty, W - 210);
+    doc.text(loyLines, 170, y); y += loyLines.length * 12 + 16;
   }
 
   // AI Trust Explanation Timeline

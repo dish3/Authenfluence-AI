@@ -19,7 +19,7 @@ export function SearchBar({ onAnalyze, defaultValue = "" }: { onAnalyze: (u: str
           <button
             key={p.id}
             type="button"
-            onClick={() => p.active && setPlatform(p.id as "youtube")}
+            onClick={() => p.active && setPlatform(p.id as any)}
             disabled={!p.active}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition ${
               platform === p.id
