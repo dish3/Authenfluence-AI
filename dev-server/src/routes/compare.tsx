@@ -10,7 +10,8 @@ import { MOCK_INFLUENCERS, type InfluencerAnalysis } from "@/lib/mock-data";
 import { compareInfluencers } from "@/lib/analyze.functions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Trophy, ArrowRight, FlaskConical, AlertCircle } from "lucide-react";
+import { Sparkles, Trophy, ArrowRight, FlaskConical, AlertCircle, Download } from "lucide-react";
+import { downloadComparisonReport } from "@/lib/report";
 import { z } from "zod";
 
 const searchSchema = z.object({ a: z.string().optional(), b: z.string().optional() });
@@ -202,21 +203,29 @@ function ComparePage() {
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-3xl p-[1px]"
-            style={{ background: "linear-gradient(135deg, var(--brand), var(--brand-purple))" }}
+            className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center"
           >
-            <div className="rounded-3xl bg-card/95 p-6 flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shrink-0 glow">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <div className="font-semibold mb-1">AI Recommendation</div>
-                <p className="text-sm text-foreground/90 leading-relaxed">
-                  {pair.recommendation ||
-                    `${pairArr![winner].displayName} is more authentic for long-term partnerships, scoring ${pairArr![winner].score} vs ${pairArr![1 - winner].score}. The trust gap of ${Math.abs(pair.a.score - pair.b.score)} points reflects healthier engagement, more genuine comments, and stronger audience quality.`}
-                </p>
+            <div className="flex-1 rounded-3xl p-[1px]" style={{ background: "linear-gradient(135deg, var(--brand), var(--brand-purple))" }}>
+              <div className="rounded-3xl bg-card/95 p-6 flex items-start gap-3 h-full">
+                <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shrink-0 glow">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="font-semibold mb-1">AI Recommendation</div>
+                  <p className="text-sm text-foreground/90 leading-relaxed">
+                    {pair.recommendation ||
+                      `${pairArr![winner].displayName} is more authentic for long-term partnerships, scoring ${pairArr![winner].score} vs ${pairArr![1 - winner].score}. The trust gap of ${Math.abs(pair.a.score - pair.b.score)} points reflects healthier engagement, more genuine comments, and stronger audience quality.`}
+                  </p>
+                </div>
               </div>
             </div>
+            <Button
+              onClick={() => downloadComparisonReport(pair.a, pair.b, pair.recommendation || `${pairArr![winner].displayName} is more authentic for long-term partnerships, scoring ${pairArr![winner].score} vs ${pairArr![1 - winner].score}. The trust gap of ${Math.abs(pair.a.score - pair.b.score)} points reflects healthier engagement, more genuine comments, and stronger audience quality.`)}
+              size="lg"
+              className="gradient-bg border-0 text-white font-semibold h-full min-h-[4rem] px-6 shrink-0 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 rounded-2xl w-full sm:w-auto"
+            >
+              <Download className="w-4 h-4" /> Export Comparison (PDF)
+            </Button>
           </motion.div>
         )}
       </main>

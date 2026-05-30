@@ -14,12 +14,12 @@ import {
   LineChart, FileSpreadsheet, History, Settings, Shield, Clock, ChevronRight, AlertCircle, 
   ArrowRight, CheckCircle2, Play, Activity, Sparkles, Heart, FileText, Check, Trophy, BadgeCheck, 
   Minus, RefreshCw, Download, Youtube, Globe, TrendingDown, BarChart3, ThumbsUp, MessageSquare, 
-  DollarSign, ArrowUpRight, Sliders, Database, Share2
+  DollarSign, ArrowUpRight, Sliders, Database, Share2, Instagram, Twitter
 } from "lucide-react";
 import { z } from "zod";
 import { ScoreRing } from "@/components/ScoreRing";
 import { BreakdownCard } from "@/components/BreakdownCard";
-import { downloadReport } from "@/lib/report";
+import { downloadReport, downloadComparisonReport } from "@/lib/report";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -136,6 +136,401 @@ function AnalyzePage() {
         </div>
         <div className="pt-2">
           <SearchBar onAnalyze={run} defaultValue={u} />
+        </div>
+      </div>
+    );
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 70) return "var(--color-success)";
+    if (score >= 50) return "var(--color-warning)";
+    return "var(--color-destructive)";
+  };
+
+  const renderCreatorForecastHeader = () => {
+    if (!result) return null;
+
+    return (
+      <div className="space-y-4">
+        {/* Unified Forecast Header */}
+        <div className="glass-strong rounded-3xl p-5 border border-border/40 relative overflow-hidden font-normal text-xs">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
+            {/* Identity Group */}
+            <div className="flex items-center gap-3.5">
+              {result.avatarUrl ? (
+                <img
+                  src={result.avatarUrl}
+                  alt={result.displayName}
+                  className="w-12 h-12 rounded-full object-cover border border-border/40 shadow-sm shrink-0"
+                />
+              ) : (
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${result.avatarColor || 'from-blue-500 to-purple-500'} flex items-center justify-center text-white text-base font-bold shadow-sm shrink-0`}>
+                  {result.displayName.charAt(0)}
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="font-bold text-sm text-foreground flex items-center gap-1">
+                    {result.displayName}
+                    {result.isVerified && (
+                      <BadgeCheck className="w-4 h-4 text-blue-500 fill-blue-500/10 shrink-0" />
+                    )}
+                  </h3>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-semibold font-mono">
+                    {result.lifecycleStage ?? "Growing"}
+                  </span>
+                </div>
+                <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted/40 px-1.5 py-0.2 rounded">
+                    <Youtube className="w-3 h-3 text-red-500" /> YouTube
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-border" />
+                  <span className="capitalize">{result.creatorCategories?.[0]?.type || "Entertainment"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Core Analytics Vectors */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full md:w-auto flex-1 md:justify-end">
+              {/* Trust Score */}
+              <div className="glass bg-muted/5 rounded-2xl p-2.5 border border-border/20 text-center shrink-0 min-w-[5.5rem] flex flex-col items-center justify-center">
+                <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Shield className="w-2.5 h-2.5 text-success" />
+                  <span>Trust Index</span>
+                </div>
+                <div className="text-sm font-black mt-0.5" style={{ color: getScoreColor(result.score) }}>{result.score}/100</div>
+              </div>
+
+              {/* Influence Velocity */}
+              <div className="glass bg-muted/5 rounded-2xl p-2.5 border border-border/20 text-center shrink-0 min-w-[6.5rem] flex flex-col items-center justify-center">
+                <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Activity className="w-2.5 h-2.5 text-primary" />
+                  <span>Influence Velocity</span>
+                </div>
+                <div className="text-sm font-black mt-0.5 text-primary">{result.influenceVelocity ?? 80}/100</div>
+              </div>
+
+              {/* Virality Potential */}
+              <div className="glass bg-muted/5 rounded-2xl p-2.5 border border-border/20 text-center shrink-0 min-w-[6rem] flex flex-col items-center justify-center">
+                <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                  <span>Virality Index</span>
+                </div>
+                <div className="text-sm font-black mt-0.5 text-purple-400">{result.viralityPotential ?? 75}/100</div>
+              </div>
+
+              {/* Projected Growth */}
+              <div className="glass bg-muted/5 rounded-2xl p-2.5 border border-border/20 text-center shrink-0 min-w-[6.5rem] flex flex-col items-center justify-center">
+                <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                  <TrendingUp className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>Growth (90d)</span>
+                </div>
+                <div className="text-sm font-black mt-0.5 text-emerald-400">+{result.projectedGrowth90Days ?? 15}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Undervalued Opportunity Warning callout */}
+        {result.isUndervalued && (
+          <div className="relative overflow-hidden rounded-2xl p-[1px]" style={{ background: "linear-gradient(135deg, rgba(234, 179, 8, 0.4), rgba(249, 115, 22, 0.4))" }}>
+            <div className="rounded-2xl bg-card/95 p-3.5 flex items-start gap-2.5 text-xs text-foreground/90 font-normal">
+              <div className="w-6 h-6 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500 shrink-0"><Sparkles className="w-4 h-4" /></div>
+              <div>
+                <div className="font-bold text-xs text-yellow-500">Undervalued Influence Opportunity Detected</div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{result.undervaluedExplanation || "Engagement acceleration significantly exceeds audience scale benchmarks, representing high-yield marketing ROI."}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMomentumRadar = () => {
+    if (!result || !result.radarMetrics) return null;
+    
+    const metrics = result.radarMetrics;
+    const data = [
+      { name: "Engagement Accel", val: metrics.engagementAccel },
+      { name: "Audience Accel", val: metrics.audienceAccel },
+      { name: "Trust Stability", val: metrics.trustStability },
+      { name: "Virality Tendency", val: metrics.viralityTendency },
+      { name: "Audience Loyalty", val: metrics.loyaltyStrength },
+      { name: "Upload Cadence", val: metrics.uploadCadence }
+    ];
+
+    const size = 260;
+    const center = size / 2;
+    const radius = 80;
+
+    const getPoint = (i: number, val: number) => {
+      const angle = (Math.PI * 2 / 6) * i - Math.PI / 2;
+      const r = (val / 100) * radius;
+      return {
+        x: center + r * Math.cos(angle),
+        y: center + r * Math.sin(angle)
+      };
+    };
+
+    const getAxisPoint = (i: number) => {
+      const angle = (Math.PI * 2 / 6) * i - Math.PI / 2;
+      return {
+        x: center + radius * Math.cos(angle),
+        y: center + radius * Math.sin(angle)
+      };
+    };
+
+    const getLabelPoint = (i: number) => {
+      const angle = (Math.PI * 2 / 6) * i - Math.PI / 2;
+      const labelRadius = radius + 20;
+      return {
+        x: center + labelRadius * Math.cos(angle),
+        y: center + labelRadius * Math.sin(angle)
+      };
+    };
+
+    const gridHexagons = [25, 50, 75, 100].map((pct) => {
+      const points = Array.from({ length: 6 }, (_, i) => {
+        const angle = (Math.PI * 2 / 6) * i - Math.PI / 2;
+        const r = (pct / 100) * radius;
+        return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
+      }).join(" ");
+      return <polygon key={pct} points={points} fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="1" />;
+    });
+
+    const polyPoints = data.map((d, i) => {
+      const pt = getPoint(i, d.val);
+      return `${pt.x},${pt.y}`;
+    }).join(" ");
+
+    return (
+      <div className="glass rounded-3xl p-5 border border-border/40 flex flex-col items-center justify-center font-normal">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 w-full text-left flex items-center gap-2">
+          <Activity className="w-4 h-4 text-primary" /> Momentum Radar System
+        </h3>
+        <div className="relative w-full flex justify-center">
+          <svg width={size} height={size + 10} className="overflow-visible">
+            {gridHexagons}
+            {Array.from({ length: 6 }).map((_, i) => {
+              const pt = getAxisPoint(i);
+              return <line key={i} x1={center} y1={center} x2={pt.x} y2={pt.y} stroke="oklch(1 0 0 / 0.08)" strokeWidth="1" />;
+            })}
+            <polygon 
+              points={polyPoints} 
+              fill="url(#radarGrad)" 
+              stroke="oklch(0.62 0.21 265)" 
+              strokeWidth="2" 
+              className="glow-polygon"
+            />
+            {data.map((d, i) => {
+              const pt = getPoint(i, d.val);
+              return (
+                <circle 
+                  key={i} 
+                  cx={pt.x} 
+                  cy={pt.y} 
+                  r="3.5" 
+                  fill="oklch(0.62 0.21 265)" 
+                  stroke="oklch(1 0 0 / 0.8)" 
+                  strokeWidth="1.5" 
+                />
+              );
+            })}
+            {data.map((d, i) => {
+              const pt = getLabelPoint(i);
+              let textAnchor = "middle";
+              let dy = "0.33em";
+              if (pt.x < center - 10) textAnchor = "end";
+              else if (pt.x > center + 10) textAnchor = "start";
+              
+              if (pt.y < center - radius + 10) dy = "-0.6em";
+              else if (pt.y > center + radius - 10) dy = "1.2em";
+
+              return (
+                <g key={i} className="text-[8px] font-mono">
+                  <text 
+                    x={pt.x} 
+                    y={pt.y} 
+                    dy={dy} 
+                    textAnchor={textAnchor} 
+                    fill="oklch(0.72 0.03 258)" 
+                    className="font-semibold"
+                  >
+                    {d.name}
+                  </text>
+                  <text 
+                    x={pt.x} 
+                    y={pt.y} 
+                    dy={dy === "-0.6em" ? "0.6em" : dy === "1.2em" ? "2.2em" : "1.33em"} 
+                    textAnchor={textAnchor} 
+                    fill="oklch(0.62 0.21 265)" 
+                    className="font-bold text-[8px]"
+                  >
+                    {d.val}/100
+                  </text>
+                </g>
+              );
+            })}
+            <defs>
+              <linearGradient id="radarGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="oklch(0.62 0.21 265)" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="oklch(0.62 0.21 265)" stopOpacity={0.05} />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEcosystemGraph = () => {
+    if (!result || !result.ecosystemNodes) return null;
+
+    const size = 260;
+    const center = size / 2;
+    const nodes = result.ecosystemNodes;
+    const radius = 80;
+
+    return (
+      <div className="glass rounded-3xl p-5 border border-border/40 flex flex-col items-center justify-center font-normal">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 w-full text-left flex items-center gap-2">
+          <Globe className="w-4 h-4 text-purple-400" /> Creator Ecosystem Overlap
+        </h3>
+        <div className="relative w-full flex justify-center">
+          <svg width={size} height={size} className="overflow-visible">
+            <defs>
+              <radialGradient id="centerNodeGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="oklch(0.62 0.21 265)" stopOpacity={1} />
+                <stop offset="100%" stopColor="oklch(0.45 0.15 264)" stopOpacity={0.8} />
+              </radialGradient>
+              <radialGradient id="neighborNodeGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="oklch(0.72 0.03 258)" stopOpacity={0.8} />
+                <stop offset="100%" stopColor="oklch(0.21 0.04 264)" stopOpacity={0.6} />
+              </radialGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+
+            {nodes.map((node, i) => {
+              const angle = (Math.PI * 2 / nodes.length) * i - Math.PI / 2;
+              const x = center + radius * Math.cos(angle);
+              const y = center + radius * Math.sin(angle);
+              return (
+                <line 
+                  key={i} 
+                  x1={center} 
+                  y1={center} 
+                  x2={x} 
+                  y2={y} 
+                  stroke="oklch(0.62 0.21 265 / 0.3)" 
+                  strokeWidth="2" 
+                  strokeDasharray="3 3"
+                />
+              );
+            })}
+
+            {nodes.map((node, i) => {
+              const angle = (Math.PI * 2 / nodes.length) * i - Math.PI / 2;
+              const x = center + radius * Math.cos(angle);
+              const y = center + radius * Math.sin(angle);
+              const nodeRadius = 24 + (node.overlapPct / 100) * 12;
+
+              return (
+                <g key={i} className="cursor-pointer font-mono group">
+                  <circle 
+                    cx={x} 
+                    cy={y} 
+                    r={nodeRadius} 
+                    fill="url(#neighborNodeGrad)" 
+                    stroke="oklch(0.72 0.03 258 / 0.4)" 
+                    strokeWidth="1.5"
+                  />
+                  <text 
+                    x={x} 
+                    y={y - 2} 
+                    textAnchor="middle" 
+                    fill="oklch(1 0 0)" 
+                    className="text-[8px] font-bold fill-foreground"
+                  >
+                    {node.overlapPct}%
+                  </text>
+                  <text 
+                    x={x} 
+                    y={y + 8} 
+                    textAnchor="middle" 
+                    fill="oklch(0.72 0.03 258)" 
+                    className="text-[7px] fill-muted-foreground font-semibold"
+                  >
+                    {node.type.toUpperCase()}
+                  </text>
+                  <text 
+                    x={x} 
+                    y={y - nodeRadius - 5} 
+                    textAnchor="middle" 
+                    fill="oklch(0.62 0.21 265)" 
+                    className="text-[8px] font-bold opacity-80"
+                  >
+                    {node.name}
+                  </text>
+                </g>
+              );
+            })}
+
+            <g filter="url(#glow)">
+              <circle 
+                cx={center} 
+                cy={center} 
+                r="32" 
+                fill="url(#centerNodeGrad)" 
+                stroke="oklch(0.62 0.21 265)" 
+                strokeWidth="2"
+              />
+              <text 
+                x={center} 
+                y={center + 3} 
+                textAnchor="middle" 
+                fill="#ffffff" 
+                className="text-[8px] font-bold font-mono tracking-wider fill-white"
+              >
+                @{result.username}
+              </text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    );
+  };
+
+  const renderIntelligenceFeed = () => {
+    if (!result || !result.intelligenceFeed) return null;
+
+    return (
+      <div className="glass rounded-3xl p-5 border border-border/40 space-y-4 font-normal">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <Database className="w-4 h-4 text-cyan-400" /> AI Intelligence Insights Feed
+        </h3>
+        <div className="bg-black/90 border border-cyan-500/20 rounded-2xl p-4 font-mono text-[10px] leading-relaxed text-cyan-400/90 shadow-inner h-[170px] overflow-y-auto space-y-2">
+          <div className="flex items-center gap-1.5 text-cyan-500/50 text-[9px] border-b border-cyan-500/10 pb-1.5 mb-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-ping" />
+            <span>CONNECTING AUTHENFLUENCE AI FORECAST ENGINE... DONE</span>
+          </div>
+          {result.intelligenceFeed.map((item, idx) => (
+            <div key={idx} className="flex gap-2 items-start animate-fade-in" style={{ animationDelay: `${idx * 150}ms` }}>
+              <span className="text-cyan-500/60 shrink-0 select-none">&gt;&gt;</span>
+              <span>{item}</span>
+            </div>
+          ))}
+          <div className="flex gap-2 items-center text-cyan-400/40 text-[8px] pt-1">
+            <span>&gt;&gt; SYSTEM ANALYST CONTINUOUS INFERENCE MODE</span>
+            <span className="w-1 h-2.5 bg-cyan-400/70 animate-pulse" />
+          </div>
         </div>
       </div>
     );
@@ -351,12 +746,18 @@ function AnalyzePage() {
             <h2 className="text-2xl font-bold tracking-tight">Creator Profile Analysis</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Audited channel information and AI profile overview</p>
           </div>
-          <div className="text-xs px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/20 font-mono font-semibold">
-            {result.dataSource === "live" ? "Live API Data" : "AI-Researched Public Profile"}
+          <div className="text-xs px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/20 font-mono font-semibold flex items-center gap-1.5 shrink-0">
+            {result.dataSource === "live" ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            <span>{result.dataSource === "live" ? "Live API Data" : "AI-Researched Public Profile"}</span>
           </div>
         </div>
 
         <SearchBar onAnalyze={run} defaultValue={u} />
+        {renderCreatorForecastHeader()}
 
         {/* Main creator profile layout */}
         <div className="grid md:grid-cols-3 gap-6 font-normal">
@@ -417,7 +818,15 @@ function AnalyzePage() {
                     className="flex items-center justify-between text-muted-foreground hover:text-foreground transition group"
                   >
                     <span className="flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" />
+                      {p.platform.toLowerCase() === "youtube" ? (
+                        <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                      ) : p.platform.toLowerCase() === "instagram" ? (
+                        <Instagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                      ) : ["twitter", "twitter/x", "x"].includes(p.platform.toLowerCase()) ? (
+                        <Twitter className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      ) : (
+                        <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      )}
                       <span>{p.platform}</span>
                     </span>
                     <span className="text-[11px] truncate max-w-[120px] font-mono">{p.handle}</span>
@@ -493,6 +902,7 @@ function AnalyzePage() {
           <h2 className="text-2xl font-bold tracking-tight">Trust Intelligence Engine</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Authenticity scoring and algorithmic creator due diligence</p>
         </div>
+        {renderCreatorForecastHeader()}
 
         <div className="grid lg:grid-cols-[220px_1fr] gap-6 items-center glass-strong rounded-3xl p-6 border border-border/40">
           <div className="justify-self-center">
@@ -651,6 +1061,7 @@ function AnalyzePage() {
           <h2 className="text-2xl font-bold tracking-tight">Growth Prediction Engine</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Machine learning forecasts on creator expansion and audience velocity</p>
         </div>
+        {renderCreatorForecastHeader()}
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="glass rounded-2xl p-4 border border-border/40 relative overflow-hidden flex flex-col justify-between min-h-[7rem]">
@@ -706,19 +1117,24 @@ function AnalyzePage() {
           </div>
         </div>
 
-        <div className="glass rounded-3xl p-6 border border-border/40 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">AI Growth Prediction Analysis</h3>
-          <p className="text-sm leading-relaxed text-foreground/80 font-normal">
-            {result.growthPotentialExplanation}
-          </p>
-          <div className="pt-3 border-t border-border/20 space-y-1.5">
-            <div className="text-xs font-semibold text-muted-foreground/80 mb-1">Momentum Trend Signals:</div>
-            {result.momentumSignals?.signals.map((sig, i) => (
-              <div key={i} className="text-xs text-muted-foreground flex items-center gap-2 font-normal">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                <span>{sig}</span>
-              </div>
-            ))}
+        {/* Two-Column Momentum & AI Analysis */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {renderMomentumRadar()}
+
+          <div className="glass rounded-3xl p-6 border border-border/40 space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">AI Growth Prediction Analysis</h3>
+            <p className="text-sm leading-relaxed text-foreground/80 font-normal">
+              {result.growthPotentialExplanation}
+            </p>
+            <div className="pt-3 border-t border-border/20 space-y-1.5">
+              <div className="text-xs font-semibold text-muted-foreground/80 mb-1">Momentum Trend Signals:</div>
+              {result.momentumSignals?.signals.map((sig, i) => (
+                <div key={i} className="text-xs text-muted-foreground flex items-center gap-2 font-normal">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  <span>{sig}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -746,6 +1162,7 @@ function AnalyzePage() {
           <h2 className="text-2xl font-bold tracking-tight">Campaign Success Estimator</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Sponsorship suitability and audience conversion potential indices</p>
         </div>
+        {renderCreatorForecastHeader()}
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="glass rounded-2xl p-5 border border-border/40 relative overflow-hidden flex flex-col justify-between min-h-[8rem]">
@@ -797,21 +1214,27 @@ function AnalyzePage() {
           </div>
         </div>
 
-        <div className="glass rounded-3xl p-6 border border-border/40 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">AI Business Impact Reasoning</h3>
-          <div className="grid sm:grid-cols-3 gap-4 font-normal">
-            <div className="glass bg-muted/10 p-4 rounded-2xl border border-border/20">
-              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Suitability Verdict</div>
-              <p className="text-xs text-foreground mt-1.5">{result.businessImpact?.suitability || result.brandRecommendation?.sponsorshipSuitability}</p>
+        {/* Two-Column Business Impact Reasoning & AI terminal Feed */}
+        <div className="grid md:grid-cols-3 gap-6 items-start">
+          <div className="md:col-span-2 glass rounded-3xl p-6 border border-border/40 space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">AI Business Impact Reasoning</h3>
+            <div className="grid sm:grid-cols-3 gap-4 font-normal">
+              <div className="glass bg-muted/10 p-4 rounded-2xl border border-border/20">
+                <div className="text-[10px] text-muted-foreground uppercase font-semibold">Suitability Verdict</div>
+                <p className="text-xs text-foreground mt-1.5">{result.businessImpact?.suitability || result.brandRecommendation?.sponsorshipSuitability}</p>
+              </div>
+              <div className="glass bg-muted/10 p-4 rounded-2xl border border-border/20">
+                <div className="text-[10px] text-muted-foreground uppercase font-semibold">Reach Stability</div>
+                <p className="text-xs text-foreground mt-1.5">{result.businessImpact?.stability || "Consistent high-impact impressions."}</p>
+              </div>
+              <div className="glass bg-muted/10 p-4 rounded-2xl border border-border/20">
+                <div className="text-[10px] text-muted-foreground uppercase font-semibold">Audience Loyalty</div>
+                <p className="text-xs text-foreground mt-1.5">{result.businessImpact?.loyalty || "Highly dedicated core audience interactions."}</p>
+              </div>
             </div>
-            <div className="glass bg-muted/10 p-4 rounded-2xl border border-border/20">
-              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Reach Stability</div>
-              <p className="text-xs text-foreground mt-1.5">{result.businessImpact?.stability || "Consistent high-impact impressions."}</p>
-            </div>
-            <div className="glass bg-muted/10 p-4 rounded-2xl border border-border/20">
-              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Audience Loyalty</div>
-              <p className="text-xs text-foreground mt-1.5">{result.businessImpact?.loyalty || "Highly dedicated core audience interactions."}</p>
-            </div>
+          </div>
+          <div className="md:col-span-1">
+            {renderIntelligenceFeed()}
           </div>
         </div>
       </div>
@@ -826,73 +1249,79 @@ function AnalyzePage() {
           <h2 className="text-2xl font-bold tracking-tight">Brand Match Intelligence</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Semantic AI alignment scoring against leading industry brands</p>
         </div>
+        {renderCreatorForecastHeader()}
 
-        <div className="glass rounded-3xl p-6 sm:p-8 border border-border/40 space-y-6">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-              <Award className="w-4 h-4 text-yellow-500" />
+        <div className="grid md:grid-cols-3 gap-6 items-start">
+          <div className="md:col-span-2 glass rounded-3xl p-6 sm:p-8 border border-border/40 space-y-6">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                <Award className="w-4 h-4 text-yellow-500" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-base">Recommended Brand Fit</h4>
+                <p className="text-xs text-muted-foreground">Matches calculated using content categories and audience compatibility</p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-semibold text-base">Recommended Brand Fit Recommendations</h4>
-              <p className="text-xs text-muted-foreground">Matches calculated using content categories and audience compatibility</p>
+
+            <div className="space-y-4">
+              {result.brandMatches?.map((match) => {
+                // Simulated breakdown values
+                const nicheAlign = Math.round(match.score * 0.95 + Math.random() * 4);
+                const audCompat = Math.round(match.score * 0.91 + Math.random() * 6);
+                const semanticSim = Math.round(match.score * 0.97 + Math.random() * 3);
+
+                return (
+                  <div key={match.brandName} className="glass bg-muted/10 p-5 rounded-2xl border border-border/20 space-y-4 font-normal">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-sm font-semibold flex items-center gap-2">
+                        <span className="text-base font-bold text-foreground">{match.brandName}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 font-mono font-semibold">
+                          {match.score}% compatibility
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground leading-normal">
+                      {match.reason}
+                    </div>
+
+                    {/* Similarity breakdown indicators */}
+                    <div className="grid sm:grid-cols-3 gap-4 pt-2 border-t border-border/10 font-normal">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                          <span>Niche Alignment</span>
+                          <span>{nicheAlign}%</span>
+                        </div>
+                        <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${nicheAlign}%` }} />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                          <span>Audience Compatibility</span>
+                          <span>{audCompat}%</span>
+                        </div>
+                        <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
+                          <div className="h-full bg-success rounded-full" style={{ width: `${audCompat}%` }} />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                          <span>Semantic Similarity</span>
+                          <span>{semanticSim}%</span>
+                        </div>
+                        <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
+                          <div className="h-full bg-purple-500 rounded-full" style={{ width: `${semanticSim}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-
-          <div className="space-y-4">
-            {result.brandMatches?.map((match) => {
-              // Simulated breakdown values
-              const nicheAlign = Math.round(match.score * 0.95 + Math.random() * 4);
-              const audCompat = Math.round(match.score * 0.91 + Math.random() * 6);
-              const semanticSim = Math.round(match.score * 0.97 + Math.random() * 3);
-
-              return (
-                <div key={match.brandName} className="glass bg-muted/10 p-5 rounded-2xl border border-border/20 space-y-4 font-normal">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="text-sm font-semibold flex items-center gap-2">
-                      <span className="text-base font-bold text-foreground">{match.brandName}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 font-mono font-semibold">
-                        {match.score}% compatibility
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="text-xs text-muted-foreground leading-normal">
-                    {match.reason}
-                  </div>
-
-                  {/* Similarity breakdown indicators */}
-                  <div className="grid sm:grid-cols-3 gap-4 pt-2 border-t border-border/10 font-normal">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
-                        <span>Niche Alignment</span>
-                        <span>{nicheAlign}%</span>
-                      </div>
-                      <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: `${nicheAlign}%` }} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
-                        <span>Audience Compatibility</span>
-                        <span>{audCompat}%</span>
-                      </div>
-                      <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
-                        <div className="h-full bg-success rounded-full" style={{ width: `${audCompat}%` }} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
-                        <span>Semantic Similarity</span>
-                        <span>{semanticSim}%</span>
-                      </div>
-                      <div className="w-full bg-muted/40 h-1.5 rounded-full overflow-hidden">
-                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${semanticSim}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="md:col-span-1">
+            {renderEcosystemGraph()}
           </div>
         </div>
       </div>
@@ -933,6 +1362,7 @@ function AnalyzePage() {
           <h2 className="text-2xl font-bold tracking-tight">Audience Trust & Sentiment Insights</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Scans public commenter dialogue for repetitive patterns, emoji spam, and bot signatures</p>
         </div>
+        {renderCreatorForecastHeader()}
 
         {/* Comment Authenticity Breakdown */}
         <div className="glass rounded-3xl p-6 sm:p-8 border border-border/40 space-y-6">
@@ -1160,14 +1590,23 @@ function AnalyzePage() {
         )}
 
         {compPair && (
-          <div className="glass rounded-3xl p-[1px] overflow-hidden" style={{ background: "linear-gradient(135deg, var(--brand), var(--brand-purple))" }}>
-            <div className="rounded-3xl bg-card/95 p-6 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center shrink-0 glow"><Sparkles className="w-5 h-5 text-white" /></div>
-              <div>
-                <div className="font-semibold text-sm mb-1">AI Recommendation Summary</div>
-                <p className="text-xs text-foreground/90 leading-relaxed font-normal">{compPair.recommendation}</p>
+          <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
+            <div className="flex-1 glass rounded-3xl p-[1px] overflow-hidden" style={{ background: "linear-gradient(135deg, var(--brand), var(--brand-purple))" }}>
+              <div className="rounded-3xl bg-card/95 p-6 flex items-start gap-3 h-full">
+                <div className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center shrink-0 glow"><Sparkles className="w-5 h-5 text-white" /></div>
+                <div>
+                  <div className="font-semibold text-sm mb-1">AI Recommendation Summary</div>
+                  <p className="text-xs text-foreground/90 leading-relaxed font-normal">{compPair.recommendation}</p>
+                </div>
               </div>
             </div>
+            <Button 
+              onClick={() => downloadComparisonReport(compPair.a, compPair.b, compPair.recommendation)} 
+              size="lg" 
+              className="gradient-bg border-0 text-white font-semibold h-full min-h-[4rem] px-6 shrink-0 shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 rounded-2xl w-full sm:w-auto"
+            >
+              <Download className="w-4 h-4" /> Export Comparison
+            </Button>
           </div>
         )}
       </div>
@@ -1196,6 +1635,7 @@ function AnalyzePage() {
           <h2 className="text-2xl font-bold tracking-tight">Trend & Momentum Analysis</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Dynamic posting cadence, upload consistency, and engagement trajectories</p>
         </div>
+        {renderCreatorForecastHeader()}
 
         {/* Momentum Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1285,6 +1725,7 @@ function AnalyzePage() {
           <h2 className="text-2xl font-bold tracking-tight">Reports & Export Utility</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Download enterprise-grade digital trust due diligence reports</p>
         </div>
+        {renderCreatorForecastHeader()}
 
         <div className="grid md:grid-cols-[1.5fr_1fr] gap-6 font-normal">
           {/* Left Column: Report templates selection */}
@@ -1401,7 +1842,17 @@ function AnalyzePage() {
               </div>
             </div>
 
-            <Button onClick={() => downloadReport(result)} size="lg" className="w-full gradient-bg border-0 text-white font-semibold">
+            <Button 
+              onClick={() => {
+                if (reportType === "compare" && compPair) {
+                  downloadComparisonReport(compPair.a, compPair.b, compPair.recommendation);
+                } else if (result) {
+                  downloadReport(result);
+                }
+              }} 
+              size="lg" 
+              className="w-full gradient-bg border-0 text-white font-semibold"
+            >
               <Download className="w-4 h-4 mr-2" /> Download Report (PDF)
             </Button>
           </div>
