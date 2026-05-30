@@ -41,24 +41,100 @@ function formatUncertaintyFactors(factors: {
   return out;
 }
 
-async function runRealAnalysis(username: string): Promise<InfluencerAnalysis | null> {
+async function runRealAnalysis(
+  username: string,
+  platform?: "youtube" | "instagram" | "twitter"
+): Promise<any> {
+  const isFallbackPlatform = platform === "instagram" || platform === "twitter";
+  
+  if (isFallbackPlatform) {
+    try {
+      const { generatePlatformFallbackAnalysis } = await import("./services/gemini.server");
+      return await generatePlatformFallbackAnalysis(username, platform);
+    } catch (fallbackErr) {
+      console.error("[Fallback Platform] Failed to generate public profile fallback:", fallbackErr);
+      return null;
+    }
+  }
 
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     console.warn("YouTube API: YOUTUBE_API_KEY is not defined. Active fallback demo mode.");
     return null;
   }
-  console.log(`[DEBUG] LIVE API ANALYSIS INITIATED for username/query: "${username}"`);
+  console.log(`[DEBUG] LIVE API ANALYSIS INITIATED for username/query: "${username}" on platform: "${platform || 'youtube'}"`);
   try {
-    const { resolveChannel, getChannelSignals, getRecentComments } = await import(
+    const { resolveChannel, getChannelSignals, getRecentComments, searchChannelCandidates } = await import(
       "./services/youtube.server"
     );
     const { computeScore, trustLabel, inferCreatorCategories } = await import("./services/scoring");
     const { detectFraudSignals } = await import("./services/fraud");
-    const { analyzeCommentsAI, generateAiTrustAnalysis } = await import("./services/gemini.server");
+    const { analyzeCommentsAI, generateAiTrustAnalysis, normalizeInputAI, matchCreatorCandidatesAI } = await import("./services/gemini.server");
 
-    // 1. Resolve Channel
-    const meta = await resolveChannel(username, apiKey);
+    // 1. Creator Identity Resolution Flow
+    let resolvedUsername = username.trim();
+    let meta: any = null;
+    let directLookupSucceeded = false;
+
+    // Check if it is a direct channel ID or looks like a handle (starts with @ or is a single word without spaces)
+    const isDirectChannelId = /^UC[a-zA-Z0-9_-]{22}$/.test(resolvedUsername);
+    const looksLikeHandle = resolvedUsername.startsWith("@") || (!resolvedUsername.includes(" ") && resolvedUsername.length > 0);
+
+    if (isDirectChannelId || looksLikeHandle) {
+      try {
+        console.log(`[DEBUG] Attempting direct lookup on raw query: "${resolvedUsername}"`);
+        meta = await resolveChannel(resolvedUsername, apiKey);
+        directLookupSucceeded = true;
+      } catch (err) {
+        console.log(`Direct lookup failed for raw query "${resolvedUsername}". Proceeding to normalization/search...`);
+      }
+    }
+
+    if (!directLookupSucceeded) {
+      if (!isDirectChannelId) {
+        // Input Normalization via Gemini
+        resolvedUsername = await normalizeInputAI(resolvedUsername);
+      }
+
+      if (isDirectChannelId || resolvedUsername.startsWith("@") || resolvedUsername.length > 0) {
+        try {
+          console.log(`[DEBUG] Attempting direct lookup on normalized query: "${resolvedUsername}"`);
+          meta = await resolveChannel(resolvedUsername, apiKey);
+          directLookupSucceeded = true;
+        } catch (err) {
+          console.log(`Direct lookup failed for normalized query "${resolvedUsername}". Proceeding to candidate search matching...`);
+        }
+      }
+    }
+
+    if (!directLookupSucceeded) {
+      // If direct ID/handle resolution fails, search and match candidates
+      const candidates = await searchChannelCandidates(resolvedUsername, apiKey);
+      if (candidates.length === 0) {
+        throw new Error("No matching creator/channel found.");
+      }
+
+      // Rank candidates using Gemini
+      const matchResult = await matchCreatorCandidatesAI(resolvedUsername, candidates);
+
+      // Low-confidence or ambiguous match trigger: require manual user selection
+      if (
+        matchResult.confidence === "Low Confidence" ||
+        matchResult.confidence === "Approximate Match" ||
+        (candidates.length > 1 && matchResult.confidence !== "Exact Match")
+      ) {
+        return {
+          status: "needs_disambiguation",
+          candidates: matchResult.rankedCandidates
+        };
+      }
+
+      if (matchResult.bestMatchChannelId) {
+        meta = await resolveChannel(matchResult.bestMatchChannelId, apiKey);
+      } else {
+        throw new Error("No matching creator/channel found.");
+      }
+    }
     console.log("LIVE CHANNEL DATA", meta);
     console.log("VIDEO COUNT", meta.totalVideos);
     const titleSeed = [...meta.title.toLowerCase().replace(/[^a-z0-9]/g, "")].reduce((a, c) => a + c.charCodeAt(0), 0) || 42;
@@ -318,16 +394,21 @@ async function runRealAnalysis(username: string): Promise<InfluencerAnalysis | n
 export const analyzeInfluencer = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({
-      username: z.string().min(1).max(80)
+      username: z.string().min(1).max(80),
+      platform: z.enum(["youtube", "instagram", "twitter"]).optional()
     }).parse(data)
   )
   .handler(async ({ data }) => {
-    const real = await runRealAnalysis(data.username);
+    const real = await runRealAnalysis(data.username, data.platform);
     if (real) {
       console.log("FALLBACK ACTIVE", false);
       return real;
     }
     console.log("FALLBACK ACTIVE", true);
+    if (data.platform === "instagram" || data.platform === "twitter") {
+      const { generatePlatformFallbackAnalysis } = await import("./services/gemini.server");
+      return await generatePlatformFallbackAnalysis(data.username, data.platform);
+    }
     return { ...analyzeMock(data.username), dataSource: "fallback" as const };
   });
 

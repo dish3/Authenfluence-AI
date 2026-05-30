@@ -26,6 +26,27 @@ interface ChannelMeta {
   thumbnail?: string;
 }
 
+export function normalizeHandle(input: string): string {
+  let clean = input.trim();
+  
+  // 1. Remove query parameters
+  clean = clean.split("?")[0];
+  
+  // 2. Remove trailing slashes
+  clean = clean.replace(/\/+$/, "");
+  
+  // 3. Remove protocols and YouTube domains
+  clean = clean.replace(/^(https?:\/\/)?(www\.)?youtube\.com\/(c\/|user\/|channel\/)?(@)?/, "");
+  
+  // 4. Remove leading @
+  clean = clean.replace(/^@/, "");
+  
+  // 5. Clean extra spaces
+  clean = clean.trim();
+  
+  return clean;
+}
+
 export async function resolveChannel(query: string, apiKey: string): Promise<ChannelMeta> {
   const cleanQuery = query.trim();
   let item: any = null;
@@ -41,42 +62,20 @@ export async function resolveChannel(query: string, apiKey: string): Promise<Cha
     item = byId?.items?.[0];
   } else {
     // Handle lookup (ensure it starts with @)
-    const handle = cleanQuery.startsWith("@") ? cleanQuery : `@${cleanQuery}`;
+    const handleOnly = normalizeHandle(cleanQuery);
+    const handle = `@${handleOnly}`;
     resolvedHandle = handle;
+    
+    console.log("NORMALIZED HANDLE:", handleOnly);
+
     const byHandle = await yt<any>(
       "channels",
       { part: "snippet,statistics,contentDetails", forHandle: handle },
       apiKey
     ).catch(() => null);
+    
+    console.log("EXACT LOOKUP RESPONSE:", byHandle);
     item = byHandle?.items?.[0];
-  }
-
-  // Fallback to search only if direct lookup by ID/handle fails
-  if (!item) {
-    console.warn(`Direct channel resolve failed for "${cleanQuery}". Trying search.list fallback...`);
-    const search = await yt<any>(
-      "search",
-      { part: "snippet", type: "channel", q: cleanQuery, maxResults: "1" },
-      apiKey
-    );
-    const channelId = search.items?.[0]?.id?.channelId;
-    if (!channelId) throw new Error("No matching creator/channel found.");
-    const ch = await yt<any>(
-      "channels",
-      { part: "snippet,statistics,contentDetails", id: channelId },
-      apiKey
-    );
-    item = ch.items?.[0];
-
-    // Enforce STRICT creator validation on search results to reject unrelated/fuzzy matches
-    if (item) {
-      const handle = item.snippet.customUrl || "";
-      const title = item.snippet.title || "";
-      if (!validateCreatorSimilarity(cleanQuery, handle, title)) {
-        console.warn(`[STRICT RESOLVE] Creator similarity check failed for query "${cleanQuery}". Found "${title}" (${handle}).`);
-        throw new Error("No matching creator/channel found.");
-      }
-    }
   }
 
   if (!item) throw new Error("No matching creator/channel found.");
@@ -114,7 +113,7 @@ export async function resolveChannel(query: string, apiKey: string): Promise<Cha
     subscribers: Number(item.statistics.subscriberCount || 0),
     totalVideos,
     totalViews: Number(item.statistics.viewCount || 0),
-    thumbnail: item.snippet.thumbnails?.default?.url,
+    thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
   };
 }
 
@@ -225,9 +224,10 @@ function getSimilarity(a: string, b: string): number {
 }
 
 export function validateCreatorSimilarity(query: string, handle: string, title: string): boolean {
-  const q = query.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const h = handle.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const t = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const cleanStr = (s: string) => s.toLowerCase().replace(/[^a-z0-9_\-\.]/g, "");
+  const q = cleanStr(query);
+  const h = cleanStr(handle);
+  const t = cleanStr(title);
 
   // 1. Exact match
   if (q === h || q === t) return true;
@@ -242,3 +242,46 @@ export function validateCreatorSimilarity(query: string, handle: string, title: 
 
   return false;
 }
+
+export async function searchChannelCandidates(
+  query: string,
+  apiKey: string
+): Promise<Array<{ channelId: string; title: string; handle: string; description: string; thumbnail: string; subscribers: number }>> {
+  const cleanQuery = query.trim();
+  console.log(`[YouTube API] Searching candidates for: "${cleanQuery}"`);
+  
+  try {
+    const search = await yt<any>(
+      "search",
+      { part: "snippet", type: "channel", q: cleanQuery, maxResults: "5" },
+      apiKey
+    );
+    
+    const items = search.items || [];
+    const channelIds = items.map((i: any) => i.id?.channelId).filter(Boolean);
+    
+    if (channelIds.length === 0) {
+      return [];
+    }
+    
+    const ch = await yt<any>(
+      "channels",
+      { part: "snippet,statistics", id: channelIds.join(",") },
+      apiKey
+    );
+    
+    const details = ch.items || [];
+    return details.map((item: any) => ({
+      channelId: item.id,
+      title: item.snippet.title,
+      handle: item.snippet.customUrl || `@${item.snippet.title.toLowerCase().replace(/\s/g, "")}`,
+      description: item.snippet.description || "",
+      thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || "",
+      subscribers: Number(item.statistics.subscriberCount || 0)
+    }));
+  } catch (e) {
+    console.error("[YouTube API] searchChannelCandidates error:", e);
+    return [];
+  }
+}
+

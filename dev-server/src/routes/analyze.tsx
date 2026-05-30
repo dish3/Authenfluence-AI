@@ -24,7 +24,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const searchSchema = z.object({ u: z.string().optional() });
+const searchSchema = z.object({ u: z.string().optional(), p: z.string().optional() });
 
 export const Route = createFileRoute("/analyze")({
   validateSearch: searchSchema,
@@ -44,7 +44,7 @@ function fmt(n: number) {
 }
 
 function AnalyzePage() {
-  const { u } = Route.useSearch();
+  const { u, p } = Route.useSearch();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<InfluencerAnalysis | null>(null);
@@ -59,6 +59,7 @@ function AnalyzePage() {
   const [themePref, setThemePref] = useState<"dark" | "light" | "system">("dark");
   const [analysisDepth, setAnalysisDepth] = useState<50 | 100>(50);
   const [confidencePref, setConfidencePref] = useState<"strict" | "balanced" | "lenient">("balanced");
+  const [disambiguationData, setDisambiguationData] = useState<{ query: string; platform: "youtube" | "instagram" | "twitter"; candidates: any[] } | null>(null);
 
   // Creator Comparison specific states
   const [compA, setCompA] = useState("mrbeast");
@@ -70,13 +71,19 @@ function AnalyzePage() {
 
   const analyze = useServerFn(analyzeInfluencer);
 
-  const run = async (username: string) => {
+  const run = async (username: string, platform: "youtube" | "instagram" | "twitter" = "youtube") => {
     setLoading(true);
     setResult(null);
     setError(null);
     const started = Date.now();
     try {
-      const a = await analyze({ data: { username } });
+      const a = (await analyze({ data: { username, platform } })) as any;
+      if (a && a.status === "needs_disambiguation") {
+        setDisambiguationData({ query: username, platform, candidates: a.candidates });
+        setLoading(false);
+        return;
+      }
+      setDisambiguationData(null);
       // ensure loading overlay shows full cinematic sequence (~3.4s)
       const elapsed = Date.now() - started;
       const minDuration = 3400;
@@ -85,7 +92,7 @@ function AnalyzePage() {
       addHistory(a);
       setRecent(getHistory());
       setLoading(false);
-      navigate({ to: "/analyze", search: { u: a.username }, replace: true });
+      navigate({ to: "/analyze", search: { u: a.username, p: a.platform }, replace: true });
       setActiveTab("creator"); // automatically open creator analysis view on done
     } catch (e: any) {
       console.error("[Analyze] Server function error:", e);
@@ -111,7 +118,7 @@ function AnalyzePage() {
 
   useEffect(() => {
     if (u && !result && !loading) {
-      run(u);
+      run(u, (p as any) || "youtube");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -152,6 +159,18 @@ function AnalyzePage() {
 
     return (
       <div className="space-y-4">
+        {result.dataSource === "fallback" && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 p-4 rounded-2xl bg-warning/10 border border-warning/20 text-warning text-xs sm:text-sm font-normal"
+          >
+            <AlertCircle className="w-5 h-5 shrink-0 animate-pulse" />
+            <div>
+              <span className="font-semibold">Demo Fallback Mode:</span> The live YouTube API is offline or unavailable (e.g. quota limit reached, network issue, or API key missing). Displaying simulated trust intelligence data for demonstration.
+            </div>
+          </motion.div>
+        )}
         {/* Unified Forecast Header */}
         <div className="glass-strong rounded-3xl p-5 border border-border/40 relative overflow-hidden font-normal text-xs">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
@@ -734,10 +753,11 @@ function AnalyzePage() {
   const renderCreatorAnalysis = () => {
     if (!result) return renderAnalyzeFirst("Creator Analysis");
     
-    const engagementVal = result.engagementRate || 
-      (result.avgLikes && result.followers 
-        ? parseFloat(((result.avgLikes / result.followers) * 100).toFixed(2)) 
-        : 1.5);
+    const engagementVal = typeof result.engagementRate === "number"
+      ? result.engagementRate.toFixed(2)
+      : (result.avgLikes && result.followers 
+          ? ((result.avgLikes / result.followers) * 100).toFixed(2) 
+          : "1.50");
 
     return (
       <div className="space-y-6 animate-fade-in">
@@ -746,13 +766,25 @@ function AnalyzePage() {
             <h2 className="text-2xl font-bold tracking-tight">Creator Profile Analysis</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Audited channel information and AI profile overview</p>
           </div>
-          <div className="text-xs px-2.5 py-1 rounded-full border bg-primary/10 text-primary border-primary/20 font-mono font-semibold flex items-center gap-1.5 shrink-0">
+          <div className={`text-xs px-2.5 py-1 rounded-full border font-mono font-semibold flex items-center gap-1.5 shrink-0 ${
+            result.dataSource === "live" 
+              ? "bg-primary/10 text-primary border-primary/20" 
+              : "bg-warning/15 text-warning border-warning/30"
+          }`}>
             {result.dataSource === "live" ? (
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            ) : result.platform === "youtube" ? (
+              <AlertCircle className="w-3.5 h-3.5 animate-pulse" />
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
-            <span>{result.dataSource === "live" ? "Live API Data" : "AI-Researched Public Profile"}</span>
+            <span>
+              {result.dataSource === "live" 
+                ? "Live API Data" 
+                : result.platform === "youtube" 
+                  ? "Demo Fallback Mode" 
+                  : "AI-Researched Public Profile"}
+            </span>
           </div>
         </div>
 
@@ -2245,7 +2277,7 @@ function AnalyzePage() {
             </motion.div>
           )}
 
-          {renderActiveTabContent()}
+          {disambiguationData ? renderDisambiguationView() : renderActiveTabContent()}
         </div>
       </main>
 
@@ -2255,3 +2287,98 @@ function AnalyzePage() {
     </div>
   );
 }
+
+  const renderDisambiguationView = () => {
+    if (!disambiguationData) return null;
+
+    const confidenceColors = {
+      "Exact Match": "bg-success/15 text-success border-success/30",
+      "Strong Match": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+      "Approximate Match": "bg-warning/15 text-warning border-warning/30",
+      "Low Confidence": "bg-destructive/15 text-destructive border-destructive/30",
+    };
+
+    return (
+      <div className="space-y-6 animate-fade-in font-normal max-w-2xl mx-auto py-6">
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto text-primary glow mb-3">
+            <Sparkles className="w-6 h-6 animate-pulse" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">Possible Creator Matches</h2>
+          <p className="text-sm text-muted-foreground">
+            We found multiple channels matching "{disambiguationData.query}". Please select the correct creator to resolve matches:
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {disambiguationData.candidates.map((candidate) => (
+            <div
+              key={candidate.channelId}
+              onClick={() => run(candidate.channelId, disambiguationData.platform)}
+              className="glass hover:border-primary/45 rounded-3xl p-5 border border-border/30 transition duration-200 cursor-pointer flex gap-4 items-start relative group"
+            >
+              {candidate.thumbnail ? (
+                <img
+                  src={candidate.thumbnail}
+                  alt={candidate.title}
+                  className="w-12 h-12 rounded-full object-cover border border-border/40 shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0">
+                  {candidate.title.charAt(0)}
+                </div>
+              )}
+              
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-semibold text-sm truncate text-foreground group-hover:text-primary transition font-sans">
+                      {candidate.title}
+                    </span>
+                    {candidate.subscribers >= 100000 && (
+                      <BadgeCheck className="w-4.5 h-4.5 text-blue-500 fill-blue-500/10 shrink-0" />
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${confidenceColors[candidate.confidence as keyof typeof confidenceColors] || "bg-muted text-muted-foreground"}`}>
+                    {candidate.confidence}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                  <span>{candidate.handle}</span>
+                  <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                  <span>{fmt(candidate.subscribers)} subscribers</span>
+                </div>
+
+                {candidate.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                    {candidate.description}
+                  </p>
+                )}
+
+                <div className="text-[10px] text-primary/80 font-semibold bg-primary/5 border border-primary/10 rounded-xl px-3 py-1.5 mt-2 flex items-start gap-1.5 leading-normal">
+                  <span className="font-bold shrink-0">AI Match Reason:</span>
+                  <span>{candidate.matchReason}</span>
+                </div>
+              </div>
+
+              <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition duration-200 text-primary">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setDisambiguationData(null)}
+            className="h-11 rounded-2xl px-6 border-border/40 text-muted-foreground hover:text-foreground"
+          >
+            Cancel & Return to Control Center
+          </Button>
+        </div>
+      </div>
+    );
+  };

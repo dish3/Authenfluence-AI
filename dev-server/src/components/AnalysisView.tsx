@@ -75,10 +75,22 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
         <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-destructive/15 text-destructive border-destructive/30">
-                <Youtube className="w-3.5 h-3.5" />
-                YouTube
-              </span>
+              {analysis.platform === "instagram" ? (
+                <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-pink-500/15 text-pink-400 border border-pink-500/30">
+                  <Instagram className="w-3.5 h-3.5 animate-fade-in" />
+                  Instagram
+                </span>
+              ) : analysis.platform === "twitter" ? (
+                <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                  <Twitter className="w-3.5 h-3.5 animate-fade-in" />
+                  Twitter / X
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-destructive/15 text-destructive border-destructive/30">
+                  <Youtube className="w-3.5 h-3.5 animate-fade-in" />
+                  YouTube
+                </span>
+              )}
               <span className={`text-xs px-2.5 py-1 rounded-full border ${
                 label.tone === "success" ? "bg-success/15 text-success border-success/30" :
                 label.tone === "warning" ? "bg-warning/15 text-warning border-warning/30" :
@@ -87,19 +99,22 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
               {analysis.confidenceLevel && (
                 <ConfidenceBadge level={analysis.confidenceLevel} />
               )}
-              {analysis.dataSource === "live" && (
+              {analysis.platform !== "youtube" ? (
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 cursor-help" title="AI-Researched Public Profile. This data has been enriched by public profile intelligence and AI research due to platform API restrictions.">
+                  <Sparkles className="w-3.5 h-3.5 mr-1" /> AI-Researched Public Profile
+                </span>
+              ) : analysis.dataSource === "live" ? (
                 <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-success/15 text-success border border-success/30 cursor-help" title="Real-time YouTube Data Verified. Verified creator metrics and real-time API synchronization.">
                   ✓ Live YouTube Data Verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-warning/15 text-warning border border-warning/30 cursor-help" title="The live YouTube API is currently offline or unavailable. Displaying simulated trust intelligence data for demonstration.">
+                  <AlertCircle className="w-3.5 h-3.5 mr-1 animate-pulse" /> Demo Fallback Mode
                 </span>
               )}
               {analysis.creatorCategories && analysis.creatorCategories.length > 0 && (
                 <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/30 cursor-help" title={`Scored relative to standard benchmarks for the ${analysis.creatorCategories[0].type} category.`}>
                   Compared against: {analysis.creatorCategories[0].type} Benchmarks
-                </span>
-              )}
-              {analysis.dataSource === "fallback" && (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-warning/15 text-warning border border-warning/30 cursor-help" title="Displaying AI-Researched Public Profile Intelligence simulated for demo purposes.">
-                  ✓ AI-Researched Public Profile Intelligence
                 </span>
               )}
             </div>
