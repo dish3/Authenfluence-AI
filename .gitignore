@@ -141,3 +141,12 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Local editor and generated project files
+.vscode/
+*.stackdump
+.turbo/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
