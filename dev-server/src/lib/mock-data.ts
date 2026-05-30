@@ -113,6 +113,27 @@ export interface InfluencerAnalysis {
   momentumSignals?: { thirtyDayGrowth: number; engagementTrajectory: "up" | "stable" | "down"; velocityScore: number; signals: string[] };
   businessImpact?: { conversionPotential: string; suitability: string; stability: string; loyalty: string };
   whyThisScore?: { positive: string[]; monitoring: string[] };
+
+  // Velocity, Virality & Future Impact Engines (v3 Upgrade)
+  influenceVelocity?: number;
+  influenceVelocityExplanation?: string;
+  lifecycleStage?: "Emerging" | "Growing" | "Accelerating" | "Peak Momentum" | "Established" | "Legacy";
+  isUndervalued?: boolean;
+  undervaluedExplanation?: string;
+  viralityPotential?: number;
+  projectedGrowth90Days?: number;
+  estimatedRoiTier?: "High" | "Medium" | "Low";
+  roiExplanation?: string;
+  radarMetrics?: {
+    engagementAccel: number;
+    audienceAccel: number;
+    trustStability: number;
+    viralityTendency: number;
+    loyaltyStrength: number;
+    uploadCadence: number;
+  };
+  ecosystemNodes?: Array<{ name: string; type: string; overlapPct: number }>;
+  intelligenceFeed?: string[];
 }
 
 const series = (base: number, vol: number) =>
@@ -786,7 +807,48 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     featureAnalysis,
     momentumSignals,
     businessImpact,
-    whyThisScore
+    whyThisScore,
+
+    // Velocity, Virality & Future Impact Engines (v3 Upgrade)
+    influenceVelocity: isPredefined ? (baseObj.influenceVelocity || Math.max(10, Math.min(99, Math.round(score * 0.95 + (seed % 10))))) : Math.max(10, Math.min(99, Math.round(score * 0.95 + (seed % 10)))),
+    influenceVelocityExplanation: score >= 75
+      ? "This creator demonstrates unusually rapid audience expansion and rising cross-community engagement relative to creator size, indicating strong future influence potential."
+      : score >= 45
+        ? "This creator demonstrates moderate audience expansion. Momentum is positive but localized within their primary community niche."
+        : "This creator demonstrates stagnant or declining audience expansion, indicating low future influence velocity.",
+    lifecycleStage: isPredefined ? baseObj.lifecycleStage :
+      (followers < 100_000 ? ("Emerging" as const) : followers < 1_000_000 ? ("Growing" as const) : followers < 10_000_000 ? ("Accelerating" as const) : ("Established" as const)),
+    isUndervalued: isPredefined ? baseObj.isUndervalued : (followers < 1_500_000 && score >= 80),
+    undervaluedExplanation: (isPredefined && baseObj.isUndervalued) || (followers < 1_500_000 && score >= 80)
+      ? "Undervalued Influence Opportunity Detected: Engagement acceleration significantly exceeds audience scale benchmarks, representing high-yield marketing ROI."
+      : "Fully valued. Influence metrics align with current subscriber scaling.",
+    viralityPotential: isPredefined ? (baseObj.viralityPotential || Math.max(15, Math.min(98, Math.round(score * 0.88 + (seed % 12))))) : Math.max(15, Math.min(98, Math.round(score * 0.88 + (seed % 12)))),
+    projectedGrowth90Days: isPredefined ? (baseObj.projectedGrowth90Days || (score >= 70 ? 22 : score >= 50 ? 8 : -2)) : (score >= 70 ? 20 : score >= 50 ? 7 : -3),
+    estimatedRoiTier: isPredefined ? (baseObj.estimatedRoiTier || (score >= 75 ? "High" : score >= 50 ? "Medium" : "Low")) : (score >= 75 ? "High" : score >= 50 ? "Medium" : "Low"),
+    roiExplanation: score >= 75 
+      ? "High partnership yield expected: Strong conversion potential for target content campaigns due to high comment authenticity." 
+      : score >= 45 
+        ? "Moderate partnership yield: Balanced conversion rates with standard campaign tracking recommended." 
+        : "Low partnership yield: High coordination and vanity metrics dilution risk.",
+    radarMetrics: isPredefined && baseObj.radarMetrics ? baseObj.radarMetrics : {
+      engagementAccel: Math.max(10, Math.min(100, Math.round(score * 0.95 + (seed % 8)))),
+      audienceAccel: Math.max(10, Math.min(100, Math.round(score * 0.91 + (seed % 10)))),
+      trustStability: score,
+      viralityTendency: Math.max(10, Math.min(100, Math.round(score * 0.88 + (seed % 12)))),
+      loyaltyStrength: Math.max(10, Math.min(100, Math.round(score * 0.94 + (seed % 6)))),
+      uploadCadence: Math.max(10, Math.min(100, Math.round(score * 0.92 + (seed % 9))))
+    },
+    ecosystemNodes: isPredefined && baseObj.ecosystemNodes ? baseObj.ecosystemNodes : [
+      { name: "Adjacent Tech Hubs", type: "tech", overlapPct: Math.round(40 + (seed % 30)) },
+      { name: "Education & Tutorials", type: "edu", overlapPct: Math.round(25 + (seed % 25)) },
+      { name: "Entertainment & Comedy", type: "fun", overlapPct: Math.round(15 + (seed % 20)) }
+    ],
+    intelligenceFeed: isPredefined && baseObj.intelligenceFeed ? baseObj.intelligenceFeed : [
+      `Audience interaction quality increased ${Math.round(5 + (seed % 15))}% over the last 30 days.`,
+      `Influence velocity (${Math.max(10, Math.min(99, Math.round(score * 0.95 + (seed % 10))))}/100) exceeds standard creator benchmarks.`,
+      "Cross-community engagement expansion detected across adjacent networks.",
+      score >= 70 ? "Momentum acceleration suggests rising creator authority." : "Irregular cadence warning issued for recent cycles."
+    ]
   };
 }
 
