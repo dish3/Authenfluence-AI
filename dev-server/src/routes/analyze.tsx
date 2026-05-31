@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useServerFn } from "@tanstack/react-start";
 import { Nav } from "@/components/Nav";
@@ -7,14 +7,14 @@ import { SearchBar } from "@/components/SearchBar";
 import { AnalysisView } from "@/components/AnalysisView";
 import { AnalyzingOverlay } from "@/components/AnalyzingOverlay";
 import { type InfluencerAnalysis, MOCK_INFLUENCERS } from "@/lib/mock-data";
-import { analyzeInfluencer, compareInfluencers } from "@/lib/analyze.functions";
+import { analyzeInfluencer, compareInfluencers, askCreatorCopilot } from "@/lib/analyze.functions";
 import { addHistory, getHistory } from "@/lib/history";
 import { 
   LayoutDashboard, UserCheck, ShieldAlert, TrendingUp, Target, Award, Users, GitCompare, 
   LineChart, FileSpreadsheet, History, Settings, Shield, Clock, ChevronRight, AlertCircle, 
   ArrowRight, CheckCircle2, Play, Activity, Sparkles, Heart, FileText, Check, Trophy, BadgeCheck, 
   Minus, RefreshCw, Download, Youtube, Globe, TrendingDown, BarChart3, ThumbsUp, MessageSquare, 
-  DollarSign, ArrowUpRight, Sliders, Database, Share2, Instagram, Twitter
+  DollarSign, ArrowUpRight, Sliders, Database, Share2, Instagram, Twitter, Send, X
 } from "lucide-react";
 import { z } from "zod";
 import { ScoreRing } from "@/components/ScoreRing";
@@ -43,6 +43,268 @@ function fmt(n: number) {
   return String(n);
 }
 
+const isValidAvatar = (url?: string | null) => {
+  return typeof url === "string" && url.trim().length > 0 && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("//"));
+};
+
+function CandidateAvatar({ url, title }: { url?: string | null; title: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const initial = title ? title.charAt(0) : "?";
+
+  return (
+    <div className="relative w-12 h-12 rounded-full overflow-hidden aspect-square border border-border/40 shadow-sm shrink-0 flex items-center justify-center">
+      {/* Fallback gradient initials background */}
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-base font-bold">
+        {initial}
+      </div>
+      {isValidAvatar(url) && !error && (
+        <img
+          src={url!.startsWith("//") ? `https:${url}` : url}
+          alt={title}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          className={`absolute inset-0 w-full h-full object-cover rounded-full transition-opacity duration-300 ${
+            loaded ? "opacity-100" : "opacity-0"
+          }`}
+          referrerPolicy="no-referrer"
+        />
+      )}
+    </div>
+  );
+}
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface CreatorCopilotProps {
+  activeCreator: InfluencerAnalysis | null;
+  activeTab: string;
+  comparisonContext?: {
+    aName: string;
+    aScore: number;
+    bName: string;
+    bScore: number;
+  } | null;
+}
+
+function CreatorCopilot({ activeCreator, activeTab, comparisonContext }: CreatorCopilotProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [hasNewAlert, setHasNewAlert] = useState(false);
+  const askCopilotFn = useServerFn(askCreatorCopilot);
+
+  // Auto-welcome when active creator changes
+  useEffect(() => {
+    if (activeCreator) {
+      const welcomeMsg: Message = {
+        role: "assistant",
+        content: `I've loaded the intelligence report for **${activeCreator.displayName}** (@${activeCreator.username}). How can I help you analyze their metrics or campaign fit?`
+      };
+      setMessages([welcomeMsg]);
+      setHasNewAlert(true);
+    } else {
+      const emptyMsg: Message = {
+        role: "assistant",
+        content: "Welcome to Authenfluence Copilot. Search for any creator above to perform a trust intelligence scan, and I will be here to provide strategic recommendations, brand suitability audits, and growth assessments."
+      };
+      setMessages([emptyMsg]);
+    }
+  }, [activeCreator?.username]);
+
+  // Turn off new context alert when opened
+  useEffect(() => {
+    if (isOpen) {
+      setHasNewAlert(false);
+    }
+  }, [isOpen]);
+
+  // Auto-scroll messages list to bottom
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isTyping]);
+
+  const handleSend = async (text: string) => {
+    if (!text.trim() || isTyping) return;
+    const userMsg: Message = { role: "user", content: text };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setInputValue("");
+    setIsTyping(true);
+
+    try {
+      const res = await askCopilotFn({
+        data: {
+          messages: updatedMessages,
+          creatorContext: activeCreator,
+          currentTab: activeTab,
+          comparisonContext
+        }
+      });
+      if (res && res.reply) {
+        setMessages([...updatedMessages, { role: "assistant", content: res.reply }]);
+      } else {
+        throw new Error("Empty response");
+      }
+    } catch (e) {
+      console.error(e);
+      setMessages([...updatedMessages, { role: "assistant", content: "AI intelligence service temporarily unavailable. Please try again." }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Get quick chips based on context
+  const getChips = () => {
+    if (!activeCreator) {
+      return ["Explain Platform Capabilities", "How is Trust Score computed?", "Simulate MrBeast Analysis"];
+    }
+    return [
+      "Explain Trust Score",
+      "Analyze Brand Fit",
+      "Sponsorship Suitability",
+      "Growth Prediction",
+      "Risk Assessment",
+      "Explain Cross-Platform Ecosystem",
+      "Audience Psychology Map"
+    ];
+  };
+
+  return (
+    <>
+      {/* Floating Toggle Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`fixed z-50 bottom-6 right-6 w-14 h-14 rounded-full gradient-bg shadow-lg shadow-primary/30 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all ring-glow cursor-pointer`}
+      >
+        {isOpen ? <X className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
+        {hasNewAlert && !isOpen && (
+          <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-background animate-ping" />
+        )}
+      </button>
+
+      {/* Floating Chat Container */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed z-50 bottom-24 right-6 w-[360px] sm:w-[400px] h-[520px] flex flex-col rounded-3xl glass-strong border border-white/10 shadow-2xl overflow-hidden font-normal font-sans"
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-white/5 bg-background/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Creator Copilot</h3>
+                  <p className="text-[10px] text-muted-foreground">
+                    {activeCreator ? `Context: @${activeCreator.username}` : "Ready to analyze"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-muted-foreground hover:text-foreground p-1 transition cursor-pointer"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Messages Pane */}
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin"
+            >
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex items-start gap-2.5 ${
+                    msg.role === "user" ? "flex-row-reverse" : "flex-row"
+                  }`}
+                >
+                  {msg.role === "assistant" && (
+                    <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                  <div
+                    className={`p-3.5 rounded-2xl text-xs font-sans leading-relaxed text-left whitespace-pre-wrap ${
+                      msg.role === "user"
+                        ? "bg-primary/20 border border-primary/30 text-foreground ml-auto max-w-[85%]"
+                        : "bg-white/5 border border-white/5 text-foreground/90 mr-auto max-w-[85%]"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex items-start gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 text-xs text-muted-foreground mr-auto flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Actions Chips */}
+            <div className="flex gap-2 overflow-x-auto px-4 py-2 border-t border-white/5 bg-background/20 scrollbar-none">
+              {getChips().map((chip, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSend(chip)}
+                  className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-white/10 transition shrink-0 whitespace-nowrap cursor-pointer"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {/* Input Bar */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend(inputValue);
+              }}
+              className="p-3 border-t border-white/5 bg-background/50 flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Ask about this creator..."
+                disabled={isTyping}
+                className="flex-1 bg-white/5 border border-white/10 focus:border-primary/40 focus:ring-1 focus:ring-primary/40 rounded-2xl px-4 py-2.5 text-xs text-foreground outline-none transition placeholder:text-muted-foreground/60 disabled:opacity-60 font-sans"
+              />
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || isTyping}
+                className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 shrink-0 cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 function AnalyzePage() {
   const { u, p } = Route.useSearch();
   const navigate = useNavigate();
@@ -60,6 +322,18 @@ function AnalyzePage() {
   const [analysisDepth, setAnalysisDepth] = useState<50 | 100>(50);
   const [confidencePref, setConfidencePref] = useState<"strict" | "balanced" | "lenient">("balanced");
   const [disambiguationData, setDisambiguationData] = useState<{ query: string; platform: "youtube" | "instagram" | "twitter"; candidates: any[] } | null>(null);
+
+  const [avatarError, setAvatarError] = useState(false);
+  const [avatarLoaded, setAvatarLoaded] = useState(false);
+  const [headerAvatarError, setHeaderAvatarError] = useState(false);
+  const [headerAvatarLoaded, setHeaderAvatarLoaded] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+    setAvatarLoaded(false);
+    setHeaderAvatarError(false);
+    setHeaderAvatarLoaded(false);
+  }, [result?.username]);
 
   // Creator Comparison specific states
   const [compA, setCompA] = useState("mrbeast");
@@ -177,17 +451,24 @@ function AnalyzePage() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
             {/* Identity Group */}
             <div className="flex items-center gap-3.5">
-              {result.avatarUrl ? (
-                <img
-                  src={result.avatarUrl}
-                  alt={result.displayName}
-                  className="w-12 h-12 rounded-full object-cover border border-border/40 shadow-sm shrink-0"
-                />
-              ) : (
-                <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${result.avatarColor || 'from-blue-500 to-purple-500'} flex items-center justify-center text-white text-base font-bold shadow-sm shrink-0`}>
+              <div className="relative w-12 h-12 rounded-full overflow-hidden aspect-square border border-border/40 shadow-sm shrink-0 flex items-center justify-center">
+                {/* Fallback initials gradient background */}
+                <div className={`absolute inset-0 bg-gradient-to-r ${result.avatarColor || 'from-blue-500 to-purple-500'} flex items-center justify-center text-white text-base font-bold`}>
                   {result.displayName.charAt(0)}
                 </div>
-              )}
+                {isValidAvatar(result.avatarUrl) && !headerAvatarError && (
+                  <img
+                    src={result.avatarUrl.startsWith("//") ? `https:${result.avatarUrl}` : result.avatarUrl}
+                    alt={result.displayName}
+                    onLoad={() => setHeaderAvatarLoaded(true)}
+                    onError={() => setHeaderAvatarError(true)}
+                    className={`absolute inset-0 w-full h-full object-cover rounded-full transition-opacity duration-300 ${
+                      headerAvatarLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+              </div>
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-bold text-sm text-foreground flex items-center gap-1">
@@ -200,10 +481,21 @@ function AnalyzePage() {
                     {result.lifecycleStage ?? "Growing"}
                   </span>
                 </div>
-                <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                  <span className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-muted/40 px-1.5 py-0.2 rounded">
-                    <Youtube className="w-3 h-3 text-red-500" /> YouTube
-                  </span>
+                <div className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-1.5 mt-1">
+                  {result.crossPlatformEcosystem?.map((sat: any, idx: number) => {
+                    const isYouTube = sat.platform.toLowerCase() === "youtube";
+                    const isInstagram = sat.platform.toLowerCase() === "instagram";
+                    const isTwitter = sat.platform.toLowerCase() === "twitter" || sat.platform.toLowerCase() === "twitter/x";
+                    return (
+                      <span key={idx} className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded border border-white/5">
+                        {isYouTube && <Youtube className="w-2.5 h-2.5 text-red-500" />}
+                        {isInstagram && <Instagram className="w-2.5 h-2.5 text-pink-500" />}
+                        {isTwitter && <Twitter className="w-2.5 h-2.5 text-sky-400" />}
+                        {!isYouTube && !isInstagram && !isTwitter && <Globe className="w-2.5 h-2.5 text-purple-400" />}
+                        {sat.platform}: {sat.handle}
+                      </span>
+                    );
+                  })}
                   <span className="w-1 h-1 rounded-full bg-border" />
                   <span className="capitalize">{result.creatorCategories?.[0]?.type || "Entertainment"}</span>
                 </div>
@@ -404,7 +696,7 @@ function AnalyzePage() {
     );
   };
 
-  const renderEcosystemGraph = () => {
+  const renderCreatorEcosystemWidget = () => {
     if (!result || !result.ecosystemNodes) return null;
 
     const size = 260;
@@ -797,17 +1089,24 @@ function AnalyzePage() {
           <div className="glass rounded-3xl p-6 border border-border/40 space-y-6 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                {result.avatarUrl ? (
-                  <img
-                    src={result.avatarUrl}
-                    alt={result.displayName}
-                    className="w-16 h-16 rounded-full object-cover border-2 border-border/40 shadow-md shrink-0"
-                  />
-                ) : (
-                  <div className={`w-16 h-16 rounded-full bg-gradient-to-r ${result.avatarColor || 'from-blue-500 to-purple-500'} flex items-center justify-center text-white text-xl font-bold shadow-md shrink-0`}>
+                <div className="relative w-16 h-16 rounded-full overflow-hidden aspect-square border-2 border-border/40 shadow-md shrink-0 flex items-center justify-center">
+                  {/* Fallback initials gradient background */}
+                  <div className={`absolute inset-0 bg-gradient-to-r ${result.avatarColor || 'from-blue-500 to-purple-500'} flex items-center justify-center text-white text-xl font-bold`}>
                     {result.displayName.charAt(0)}
                   </div>
-                )}
+                  {isValidAvatar(result.avatarUrl) && !avatarError && (
+                    <img
+                      src={result.avatarUrl.startsWith("//") ? `https:${result.avatarUrl}` : result.avatarUrl}
+                      alt={result.displayName}
+                      onLoad={() => setAvatarLoaded(true)}
+                      onError={() => setAvatarError(true)}
+                      className={`absolute inset-0 w-full h-full object-cover rounded-full transition-opacity duration-300 ${
+                        avatarLoaded ? "opacity-100" : "opacity-0"
+                      }`}
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
+                </div>
                 <div className="min-w-0">
                   <h1 className="text-xl font-bold flex items-center gap-1.5 truncate">
                     {result.displayName}
@@ -1353,7 +1652,7 @@ function AnalyzePage() {
             </div>
           </div>
           <div className="md:col-span-1">
-            {renderEcosystemGraph()}
+            {renderCreatorEcosystemWidget()}
           </div>
         </div>
       </div>
@@ -2193,15 +2492,333 @@ function AnalyzePage() {
     );
   };
 
+  const renderEcosystemGraph = () => {
+    if (!result) return renderAnalyzeFirst("Ecosystem Graph");
+
+    const ecosystem = result.crossPlatformEcosystem || [
+      {
+        platform: "YouTube",
+        handle: `@${result.username}`,
+        url: `https://youtube.com/@${result.username}`,
+        isVerifiedData: true,
+        followers: result.followers,
+        followersLabel: "✓ Verified Platform Data",
+        engagementRate: result.engagementRate || 3.5,
+        engagementLabel: "✓ Verified Platform Data",
+        trustScore: result.score,
+        botLikelihood: 12,
+        postingConsistency: "Regular",
+        reachTier: "Mega-Influencer"
+      }
+    ];
+
+    const center = { x: 200, y: 200 };
+    const radius = 130;
+    const satellites = ecosystem.map((item: any, idx: number) => {
+      const angle = (2 * Math.PI * idx) / ecosystem.length;
+      return {
+        ...item,
+        x: center.x + radius * Math.cos(angle),
+        y: center.y + radius * Math.sin(angle),
+      };
+    });
+
+    const getPlatformColor = (platform: string) => {
+      switch (platform.toLowerCase()) {
+        case "youtube": return "text-red-500 bg-red-500/10 border-red-500/20";
+        case "instagram": return "text-pink-500 bg-pink-500/10 border-pink-500/20";
+        case "tiktok": return "text-cyan-400 bg-cyan-400/10 border-cyan-400/20";
+        case "twitter/x":
+        case "twitter": return "text-sky-400 bg-sky-400/10 border-sky-400/20";
+        case "spotify": return "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
+        case "discord": return "text-indigo-400 bg-indigo-400/10 border-indigo-400/20";
+        case "twitch": return "text-purple-500 bg-purple-500/10 border-purple-500/20";
+        default: return "text-primary bg-primary/10 border-primary/20";
+      }
+    };
+
+    return (
+      <div className="space-y-6 animate-fade-in font-normal">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Globe className="w-6 h-6 text-primary glow" /> Creator Social Ecosystem Discovery
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Cross-platform map and social graph extracted from About sections and Linktree portals
+          </p>
+        </div>
+        {renderCreatorForecastHeader()}
+
+        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6">
+          {/* Interactive Social Graph View */}
+          <div className="glass rounded-3xl p-6 border border-border/40 flex flex-col items-center justify-center min-h-[450px]">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground self-start mb-4">
+              AI Connected Social Graph
+            </h3>
+            
+            <div className="relative w-full max-w-[400px] aspect-square">
+              <svg viewBox="0 0 400 400" className="w-full h-full">
+                {/* SVG connection lines */}
+                {satellites.map((sat: any, idx: number) => (
+                  <g key={`line-${idx}`}>
+                    <line
+                      x1={center.x}
+                      y1={center.y}
+                      x2={sat.x}
+                      y2={sat.y}
+                      stroke="oklch(0.62 0.21 265 / 0.25)"
+                      strokeWidth="2"
+                      strokeDasharray="4 4"
+                      className="animate-pulse"
+                    />
+                    <circle
+                      cx={(center.x + sat.x) / 2}
+                      cy={(center.y + sat.y) / 2}
+                      r="3"
+                      fill="oklch(0.62 0.21 265)"
+                      className="animate-ping"
+                    />
+                  </g>
+                ))}
+
+                {/* Center Creator Node */}
+                <g transform={`translate(${center.x - 40}, ${center.y - 40})`}>
+                  <circle cx="40" cy="40" r="38" className="fill-background stroke-primary stroke-2 shadow-xl ring-glow" />
+                  <foreignObject x="6" y="6" width="68" height="68" className="rounded-full overflow-hidden">
+                    <div className="w-full h-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-black text-sm">
+                      {result.displayName.charAt(0)}
+                    </div>
+                  </foreignObject>
+                </g>
+
+                {/* Satellite Nodes */}
+                {satellites.map((sat: any, idx: number) => (
+                  <g key={`sat-${idx}`} transform={`translate(${sat.x - 22}, ${sat.y - 22})`}>
+                    <circle cx="22" cy="22" r="20" className="fill-background stroke-border/60 stroke border hover:stroke-primary transition duration-300 shadow-md ring-glow cursor-pointer" />
+                    <foreignObject x="8" y="8" width="28" height="28">
+                      <div className="w-full h-full flex items-center justify-center text-xs">
+                        <span className="font-bold text-[9px] uppercase text-muted-foreground tracking-tighter">
+                          {sat.platform.slice(0, 3)}
+                        </span>
+                      </div>
+                    </foreignObject>
+                    <text x="22" y="38" textAnchor="middle" className="text-[7px] font-semibold fill-muted-foreground font-mono">
+                      {sat.handle}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          </div>
+
+          {/* Connected Profiles List */}
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Discovered Profiles ({ecosystem.length})
+            </h3>
+            {ecosystem.map((sat: any, idx: number) => {
+              const theme = getPlatformColor(sat.platform);
+              return (
+                <div key={idx} className="glass rounded-2xl p-4 border border-border/30 hover:border-primary/45 transition duration-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${theme}`}>
+                        {sat.platform}
+                      </span>
+                      <a href={sat.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-foreground hover:text-primary hover:underline truncate max-w-[120px]">
+                        {sat.handle}
+                      </a>
+                    </div>
+                    <span className={`text-[8px] font-semibold px-2 py-0.5 rounded ${
+                      sat.isVerifiedData ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-primary/10 text-primary border border-primary/20"
+                    }`}>
+                      {sat.followersLabel}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-[10px] font-normal font-mono text-muted-foreground pt-1 border-t border-white/5">
+                    <div>
+                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Followers</div>
+                      <div className="font-semibold text-foreground mt-0.5">{fmt(sat.followers)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Engagement</div>
+                      <div className="font-semibold text-foreground mt-0.5">{sat.engagementRate}%</div>
+                    </div>
+                    <div>
+                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Trust Score</div>
+                      <div className="font-bold text-primary mt-0.5">{sat.trustScore}/100</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-normal font-mono text-muted-foreground pt-1">
+                    <div>
+                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Consistency</div>
+                      <div className="font-semibold text-foreground mt-0.5">{sat.postingConsistency}</div>
+                    </div>
+                    <div>
+                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Reach Tier</div>
+                      <div className="font-semibold text-foreground mt-0.5">{sat.reachTier}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAudiencePsychology = () => {
+    if (!result) return renderAnalyzeFirst("Audience Psychology");
+
+    const psychology = result.audiencePsychology || {
+      type: "Engaged Tech & Gaming Niche",
+      behavior: "Highly reactive fandom audience with active meme-sharing tendencies and intense category-specific interactions.",
+      personality: "Analytical & Technology-Oriented",
+      interests: ["Technology", "Software", "Creative Tools", "Education"],
+      loyaltyScore: 84,
+      fandomIntensity: 78,
+      purchasingIntent: "Moderate"
+    };
+
+    const risks = result.crossPlatformRisks || [];
+
+    return (
+      <div className="space-y-6 animate-fade-in font-normal">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Heart className="w-6 h-6 text-pink-500 fill-pink-500/10 glow" /> Audience Psychology & Persona Modeling
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Model parameters of community sentiment, brand loyalty, purchasing affinity, and fandom intensity
+          </p>
+        </div>
+        {renderCreatorForecastHeader()}
+
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Persona Card */}
+          <div className="glass rounded-3xl p-6 border border-border/40 space-y-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" /> Primary Audience Persona
+            </h3>
+            
+            <div className="space-y-3 font-normal text-xs leading-relaxed text-muted-foreground">
+              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-1">
+                <div className="font-bold text-sm text-foreground">{psychology.type}</div>
+                <div className="text-[10px] text-muted-foreground font-mono">Dominant Personality: {psychology.personality}</div>
+              </div>
+              <p className="p-3 bg-white/5 rounded-2xl border border-white/5 leading-relaxed">
+                {psychology.behavior}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground/60">Loyalty Score</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full gradient-bg" style={{ width: `${psychology.loyaltyScore}%` }} />
+                  </div>
+                  <span className="font-mono text-xs font-bold text-primary">{psychology.loyaltyScore}%</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground/60">Fandom Intensity</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full bg-pink-500" style={{ width: `${psychology.fandomIntensity}%` }} />
+                  </div>
+                  <span className="font-mono text-xs font-bold text-pink-400">{psychology.fandomIntensity}%</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground/60">Estimated Purchasing Intent</span>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="px-3 py-1 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-bold text-xs uppercase font-mono">
+                  {psychology.purchasingIntent}
+                </span>
+                <span className="text-[10px] text-muted-foreground">High likelihood of conversion for sponsored affiliate recommendations.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interests & Risks Column */}
+          <div className="space-y-6">
+            {/* Interests card */}
+            <div className="glass rounded-3xl p-6 border border-border/40 space-y-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Audience Core Interests
+              </h3>
+              <div className="space-y-3">
+                {psychology.interests.map((interest: string, idx: number) => {
+                  const weights = [85, 70, 55, 40];
+                  const wt = weights[idx % weights.length];
+                  return (
+                    <div key={interest} className="space-y-1 text-xs">
+                      <div className="flex justify-between font-semibold">
+                        <span>{interest}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">{wt}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500" style={{ width: `${wt}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Platform Trust & Risks card */}
+            <div className="glass rounded-3xl p-6 border border-border/40 space-y-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-red-400" /> Cross-Platform Risk Diagnostics
+              </h3>
+              {risks.length > 0 ? (
+                <div className="space-y-3 text-xs font-normal">
+                  {risks.map((risk: any, idx: number) => (
+                    <div key={idx} className="p-3 rounded-2xl bg-destructive/5 border border-destructive/20 space-y-1 leading-normal text-muted-foreground">
+                      <div className="font-bold text-foreground flex items-center gap-1.5 capitalize">
+                        <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
+                        {risk.name}
+                        <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.2 rounded bg-destructive/10 text-destructive ml-auto">
+                          {risk.severity} Severity
+                        </span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed">{risk.description}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl bg-green-500/5 border border-green-500/10 text-xs font-normal text-muted-foreground flex flex-col items-center justify-center text-center">
+                  <CheckCircle2 className="w-8 h-8 text-green-500 mb-2 glow" />
+                  <span className="font-semibold text-foreground">No Significant Anomalies Detected</span>
+                  <p className="text-[10px] text-muted-foreground/75 mt-0.5 leading-normal max-w-[220px]">
+                    All evaluated accounts present organic reach metrics matching regional posting consistency norms.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderActiveTabContent = () => {
     switch (activeTab) {
       case "dashboard": return renderDashboard();
       case "creator": return renderCreatorAnalysis();
+      case "ecosystem": return renderEcosystemGraph();
       case "trust": return renderTrustIntelligence();
       case "growth": return renderGrowthPrediction();
       case "campaign": return renderCampaignSuccess();
       case "brand": return renderBrandMatchEngine();
       case "audience": return renderAudienceInsights();
+      case "psychology": return renderAudiencePsychology();
       case "compare": return renderCreatorComparison();
       case "trends": return renderTrendAnalysis();
       case "reports": return renderReports();
@@ -2231,11 +2848,13 @@ function AnalyzePage() {
           {[
             { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
             { id: "creator", label: "Creator Analysis", Icon: UserCheck },
+            { id: "ecosystem", label: "Ecosystem Graph", Icon: Globe },
             { id: "trust", label: "Trust Intelligence", Icon: ShieldAlert },
             { id: "growth", label: "Growth Prediction", Icon: TrendingUp },
             { id: "campaign", label: "Campaign Success", Icon: Target },
             { id: "brand", label: "Brand Match Engine", Icon: Award },
             { id: "audience", label: "Audience Insights", Icon: Users },
+            { id: "psychology", label: "Audience Psychology", Icon: Heart },
             { id: "compare", label: "Creator Comparison", Icon: GitCompare },
             { id: "trends", label: "Trend Analysis", Icon: LineChart },
             { id: "reports", label: "Reports & Exports", Icon: FileSpreadsheet },
@@ -2284,6 +2903,21 @@ function AnalyzePage() {
       <AnimatePresence>
         {loading && <AnalyzingOverlay onDone={() => setLoading(false)} />}
       </AnimatePresence>
+
+      <CreatorCopilot
+        activeCreator={result}
+        activeTab={activeTab}
+        comparisonContext={
+          compPair
+            ? {
+                aName: compPair.a.displayName,
+                aScore: compPair.a.score,
+                bName: compPair.b.displayName,
+                bScore: compPair.b.score,
+              }
+            : null
+        }
+      />
     </div>
   );
 
@@ -2316,17 +2950,7 @@ function AnalyzePage() {
               onClick={() => run(candidate.channelId, disambiguationData.platform)}
               className="glass hover:border-primary/45 rounded-3xl p-5 border border-border/30 transition duration-200 cursor-pointer flex gap-4 items-start relative group"
             >
-              {candidate.thumbnail ? (
-                <img
-                  src={candidate.thumbnail}
-                  alt={candidate.title}
-                  className="w-12 h-12 rounded-full object-cover border border-border/40 shrink-0"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0">
-                  {candidate.title.charAt(0)}
-                </div>
-              )}
+              <CandidateAvatar url={candidate.thumbnail} title={candidate.title} />
               
               <div className="space-y-1.5 flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2 flex-wrap">

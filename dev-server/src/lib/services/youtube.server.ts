@@ -24,6 +24,7 @@ interface ChannelMeta {
   totalVideos: number;
   totalViews: number;
   thumbnail?: string;
+  description?: string;
 }
 
 export function normalizeHandle(input: string): string {
@@ -114,6 +115,7 @@ export async function resolveChannel(query: string, apiKey: string): Promise<Cha
     totalVideos,
     totalViews: Number(item.statistics.viewCount || 0),
     thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
+    description: item.snippet.description || "",
   };
 }
 
@@ -284,4 +286,97 @@ export async function searchChannelCandidates(
     return [];
   }
 }
+
+export interface DiscoveredSocial {
+  platform: string;
+  url: string;
+  handle: string;
+}
+
+export function extractSocialLinks(text: string): DiscoveredSocial[] {
+  const discovered: DiscoveredSocial[] = [];
+  
+  const extractHandle = (url: string, platform: string) => {
+    try {
+      const cleanUrl = url.split("?")[0].replace(/\/+$/, "");
+      const parts = cleanUrl.split("/");
+      let h = parts[parts.length - 1];
+      if (h.startsWith("@")) h = h.slice(1);
+      return h;
+    } catch {
+      return "profile";
+    }
+  };
+
+  const platforms = [
+    { name: "Instagram", regex: /(https?:\/\/)?(www\.)?instagram\.com\/([a-zA-Z0-9_.-]+)/gi },
+    { name: "Twitter/X", regex: /(https?:\/\/)?(www\.)?(twitter|x)\.com\/([a-zA-Z0-9_.-]+)/gi },
+    { name: "TikTok", regex: /(https?:\/\/)?(www\.)?tiktok\.com\/@([a-zA-Z0-9_.-]+)/gi },
+    { name: "Spotify", regex: /(https?:\/\/)?(www\.)?(open\.)?spotify\.com\/(artist|user)\/([a-zA-Z0-9_-]+)/gi },
+    { name: "Discord", regex: /(https?:\/\/)?(www\.)?(discord\.gg|discord\.com\/invite)\/([a-zA-Z0-9_-]+)/gi },
+    { name: "Twitch", regex: /(https?:\/\/)?(www\.)?twitch\.tv\/([a-zA-Z0-9_.-]+)/gi },
+    { name: "LinkedIn", regex: /(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/([a-zA-Z0-9_.-]+)/gi },
+    { name: "Facebook", regex: /(https?:\/\/)?(www\.)?facebook\.com\/([a-zA-Z0-9_.-]+)/gi },
+  ];
+
+  for (const p of platforms) {
+    const matches = [...text.matchAll(p.regex)];
+    for (const match of matches) {
+      const url = match[0];
+      const handle = extractHandle(url, p.name);
+      if (handle && handle !== "channel" && handle !== "c" && handle !== "user") {
+        if (!discovered.some(d => d.url === url || (d.platform === p.name && d.handle === `@${handle}`))) {
+          discovered.push({ platform: p.name, url, handle: `@${handle}` });
+        }
+      }
+    }
+  }
+
+  return discovered;
+}
+
+export async function crawlLinktree(linktreeUrl: string): Promise<DiscoveredSocial[]> {
+  try {
+    const formattedUrl = linktreeUrl.startsWith("http") ? linktreeUrl : `https://${linktreeUrl}`;
+    const res = await fetch(formattedUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+      }
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+    return extractSocialLinks(html);
+  } catch (e) {
+    console.warn("[Linktree Crawler] Failed to crawl Linktree:", e);
+    return [];
+  }
+}
+
+export async function discoverEcosystemLinks(description: string): Promise<DiscoveredSocial[]> {
+  const directLinks = extractSocialLinks(description);
+  
+  // Find Linktree or similar links in description
+  const linktreeRegex = /(https?:\/\/)?(www\.)?linktr\.ee\/([a-zA-Z0-9_-]+)/gi;
+  const linktreeMatches = [...description.matchAll(linktreeRegex)];
+  
+  if (linktreeMatches.length > 0) {
+    const crawledResults = await Promise.all(
+      linktreeMatches.map(m => crawlLinktree(m[0]))
+    );
+    
+    // Combine and deduplicate
+    const combined = [...directLinks];
+    for (const list of crawledResults) {
+      for (const item of list) {
+        if (!combined.some(d => d.platform === item.platform && d.handle === item.handle)) {
+          combined.push(item);
+        }
+      }
+    }
+    return combined;
+  }
+  
+  return directLinks;
+}
+
 

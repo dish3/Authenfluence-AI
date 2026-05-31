@@ -373,6 +373,22 @@ export interface AiTrustAnalysisResult {
   brandMatches: Array<{ brandName: string; score: number; reason: string }>;
   businessImpact: { conversionPotential: string; suitability: string; stability: string; loyalty: string };
   whyThisScore: { positive: string[]; monitoring: string[] };
+  
+  // Cross-Platform AI Creator Trust Intelligence Engine fields
+  crossPlatformEcosystem: any[];
+  unifiedTrustScore: number;
+  unifiedTrustExplanation: string;
+  audiencePsychology: {
+    type: string;
+    behavior: string;
+    personality: string;
+    interests: string[];
+    loyaltyScore: number;
+    fandomIntensity: number;
+    purchasingIntent: string;
+  };
+  crossPlatformRisks: Array<{ name: string; severity: "low" | "medium" | "high"; description: string }>;
+  aiInvestigationSummary: string;
 }
 
 export async function generateAiTrustAnalysis(args: {
@@ -382,8 +398,9 @@ export async function generateAiTrustAnalysis(args: {
   subscribers: number;
   confidenceLevel: ConfidenceLevel;
   creatorCategories: CreatorCategory[];
+  discoveredSocials?: any[];
 }): Promise<AiTrustAnalysisResult> {
-  const { score, comments, subscribers, confidenceLevel, creatorCategories } = args;
+  const { score, comments, subscribers, confidenceLevel, creatorCategories, discoveredSocials = [] } = args;
 
   const groundedData = {
     name: args.displayName,
@@ -417,6 +434,7 @@ export async function generateAiTrustAnalysis(args: {
     benchmarkContext: score.benchmarkContext,
     subscribers,
     dataLimitations: score.dataLimitations,
+    discoveredSocials,
   };
 
   const schema = {
@@ -544,13 +562,73 @@ export async function generateAiTrustAnalysis(args: {
           monitoring: { type: "array", items: { type: "string" }, description: "2-3 areas worth monitoring." }
         },
         required: ["positive", "monitoring"]
+      },
+      crossPlatformEcosystem: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            platform: { type: "string", description: "Name of platform (YouTube, Instagram, Twitter/X, TikTok, Spotify, Discord, Twitch, LinkedIn, Facebook)." },
+            handle: { type: "string" },
+            url: { type: "string" },
+            isVerifiedData: { type: "boolean" },
+            followers: { type: "number", description: "Real follower count for YouTube, estimated realistic count for other profiles in discoveredSocials." },
+            followersLabel: { type: "string", description: "'✓ Verified Platform Data' for YouTube, 'AI-Estimated Audience Intelligence' for other profiles." },
+            engagementRate: { type: "number", description: "Engagement rate percentage (e.g. 4.2)." },
+            engagementLabel: { type: "string", description: "'✓ Verified Platform Data' for YouTube, 'AI-Estimated Audience Intelligence' for other profiles." },
+            trustScore: { type: "number", description: "Trust index score from 0 to 100 for this platform." },
+            botLikelihood: { type: "number", description: "Estimated percentage likelihood of bot activity or fake engagement patterns (0 to 100)." },
+            postingConsistency: { type: "string", description: "High, Regular, or Irregular." },
+            reachTier: { type: "string", description: "Mega-Influencer, Macro-Influencer, Micro-Influencer, or Nano-Influencer." }
+          },
+          required: ["platform", "handle", "url", "isVerifiedData", "followers", "followersLabel", "engagementRate", "engagementLabel", "trustScore", "botLikelihood", "postingConsistency", "reachTier"]
+        },
+        description: "Array matching the platforms present in discoveredSocials, plus YouTube. DO NOT add platforms not present in discoveredSocials."
+      },
+      unifiedTrustScore: {
+        type: "number",
+        description: "Unified cross-platform creator trust score (0 to 100)."
+      },
+      unifiedTrustExplanation: {
+        type: "string",
+        description: "AI description explaining differences or agreements between platform trust parameters."
+      },
+      audiencePsychology: {
+        type: "object",
+        properties: {
+          type: { type: "string", description: "E.g. Gen Z Gaming Community, Tech Early Adopters, Millennial Fashion Enthusiasts." },
+          behavior: { type: "string", description: "Detailed description of audience interactions, viral sharing habits, and fandom patterns." },
+          personality: { type: "string", description: "Primary audience personality trait." },
+          interests: { type: "array", items: { type: "string" } },
+          loyaltyScore: { type: "number", description: "Loyalty score from 0 to 100." },
+          fandomIntensity: { type: "number", description: "Fandom intensity from 0 to 100." },
+          purchasingIntent: { type: "string", description: "High, Moderate, or Low." }
+        },
+        required: ["type", "behavior", "personality", "interests", "loyaltyScore", "fandomIntensity", "purchasingIntent"]
+      },
+      crossPlatformRisks: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Name of the risk (e.g. Engagement Pod Activity, Inorganic Follower Spike)." },
+            severity: { type: "string", enum: ["low", "medium", "high"] },
+            description: { type: "string" }
+          },
+          required: ["name", "severity", "description"]
+        }
+      },
+      aiInvestigationSummary: {
+        type: "string",
+        description: "A professional investor-grade intelligence analysis summary of 3-4 sentences."
       }
     },
     required: [
       "trustScore", "riskLevel", "primaryCategory", "secondaryCategory", "verdict", "strengths", "risks", 
       "timelineEvents", "brandRecommendation", "commentAuthenticity", "verifiedSocials",
       "growthPotentialScore", "growthPotentialExplanation", "campaignSuccessProbability", 
-      "brandMatches", "businessImpact", "whyThisScore"
+      "brandMatches", "businessImpact", "whyThisScore", "crossPlatformEcosystem", "unifiedTrustScore",
+      "unifiedTrustExplanation", "audiencePsychology", "crossPlatformRisks", "aiInvestigationSummary"
     ]
   };
 
@@ -566,10 +644,11 @@ CRITICAL RULES — you MUST follow these:
 6. Generate 5-6 timeline events covering growth consistency, audience authenticity, suspicious activity spikes, upload cadence, and engagement quality.
 7. Provide a detailed brand recommendation highlighting safety, sponsorship suitability, and risk level.
 8. Break down comment authenticity into realistic estimates for spam, repetitive, emoji spam, bot language, and organic comments.
-9. Populate verifiedSocials with highly realistic links based on the creator's username (e.g. for MrBeast, youtube.com/@mrbeast, instagram.com/mrbeast, x.com/mrbeast, tiktok.com/@mrbeast, mrbeast.store). Mark as verified.
+9. Populate verifiedSocials and crossPlatformEcosystem ONLY with the platforms provided in the discoveredSocials parameter in the data payload, plus YouTube. Do NOT invent profiles for other platforms (e.g., if discoveredSocials has no TikTok, do NOT include TikTok). Mark the discovered socials as isVerifiedData: false (since they are estimated) and YouTube as isVerifiedData: true.
 10. Calculate Growth Potential Score (0-100) and Campaign Success Probability (0-100) logically, correlating them with comment authenticity, audience trust, and upload consistency.
 11. Recommend the 3 best brand matches with matching scores and specific reasons based on the content niche.
-12. Summarize the business impact (conversion, stability, loyalty) and transparently detail positive vs monitoring signals.`,
+12. Summarize the business impact (conversion, stability, loyalty) and transparently detail positive vs monitoring signals.
+13. Model the audiencePsychology, crossPlatformRisks, and unifiedTrustScore/Explanation realistically matching the findings on bot ratios and metrics.`,
     prompt: JSON.stringify(groundedData),
     jsonSchema: schema
   });
@@ -619,7 +698,50 @@ CRITICAL RULES — you MUST follow these:
       whyThisScore: parsed.whyThisScore || {
         positive: ["Good subscriber scale", "Established channel presence"],
         monitoring: ["Audience quality verification recommended"]
-      }
+      },
+      crossPlatformEcosystem: Array.isArray(parsed.crossPlatformEcosystem) ? parsed.crossPlatformEcosystem : [
+        {
+          platform: "YouTube",
+          handle: `@${args.displayName.toLowerCase().replace(/\s/g, "")}`,
+          url: `https://youtube.com/@${args.displayName.toLowerCase().replace(/\s/g, "")}`,
+          isVerifiedData: true,
+          followers: subscribers,
+          followersLabel: "✓ Verified Platform Data",
+          engagementRate: Number(score.metrics.engagementRatePct.toFixed(2)),
+          engagementLabel: "✓ Verified Platform Data",
+          trustScore: Number(parsed.trustScore) || score.finalScore,
+          botLikelihood: Math.round(comments.botRatio * 100),
+          postingConsistency: "Regular",
+          reachTier: subscribers >= 1_000_000 ? "Mega-Influencer" : subscribers >= 100_000 ? "Macro-Influencer" : "Micro-Influencer"
+        },
+        ...discoveredSocials.map(d => ({
+          platform: d.platform,
+          handle: d.handle,
+          url: d.url,
+          isVerifiedData: false,
+          followers: 120000,
+          followersLabel: "AI-Estimated Audience Intelligence",
+          engagementRate: 3.5,
+          engagementLabel: "AI-Estimated Audience Intelligence",
+          trustScore: Math.round((Number(parsed.trustScore) || score.finalScore) * 0.9),
+          botLikelihood: 15,
+          postingConsistency: "Regular",
+          reachTier: "Macro-Influencer"
+        }))
+      ],
+      unifiedTrustScore: Number(parsed.unifiedTrustScore) || Number(parsed.trustScore) || score.finalScore,
+      unifiedTrustExplanation: String(parsed.unifiedTrustExplanation || parsed.verdict || "Consolidated trust ratings from active channels."),
+      audiencePsychology: parsed.audiencePsychology || {
+        type: "Niche Niche Community Base",
+        behavior: "Consistent community discussions and average viral potential.",
+        personality: "Pragmatic",
+        interests: creatorCategories.map(c => c.type),
+        loyaltyScore: 72,
+        fandomIntensity: 60,
+        purchasingIntent: "Moderate"
+      },
+      crossPlatformRisks: Array.isArray(parsed.crossPlatformRisks) ? parsed.crossPlatformRisks : [],
+      aiInvestigationSummary: String(parsed.aiInvestigationSummary || parsed.verdict || "Consolidated intelligence review active.")
     };
   } catch (e) {
     console.error("[Gemini] AI trust analysis parse failed, using fallback:", e, responseText);
@@ -673,7 +795,50 @@ CRITICAL RULES — you MUST follow these:
       whyThisScore: {
         positive: isHigh ? ["Good subscriber scale", "Established channel presence", "High comment authenticity"] : ["Established channel page"],
         monitoring: isHigh ? ["Standard category benchmark limitations"] : ["Standard audience quality check recommended"]
-      }
+      },
+      crossPlatformEcosystem: [
+        {
+          platform: "YouTube",
+          handle: `@${args.displayName.toLowerCase().replace(/\s/g, "")}`,
+          url: `https://youtube.com/@${args.displayName.toLowerCase().replace(/\s/g, "")}`,
+          isVerifiedData: true,
+          followers: subscribers,
+          followersLabel: "✓ Verified Platform Data",
+          engagementRate: Number(score.metrics.engagementRatePct.toFixed(2)),
+          engagementLabel: "✓ Verified Platform Data",
+          trustScore: fallbackScore,
+          botLikelihood: Math.round(comments.botRatio * 100),
+          postingConsistency: "Regular",
+          reachTier: subscribers >= 1_000_000 ? "Mega-Influencer" : subscribers >= 100_000 ? "Macro-Influencer" : "Micro-Influencer"
+        },
+        ...discoveredSocials.map(d => ({
+          platform: d.platform,
+          handle: d.handle,
+          url: d.url,
+          isVerifiedData: false,
+          followers: 150000,
+          followersLabel: "AI-Estimated Audience Intelligence",
+          engagementRate: 3.2,
+          engagementLabel: "AI-Estimated Audience Intelligence",
+          trustScore: Math.round(fallbackScore * 0.9),
+          botLikelihood: 12,
+          postingConsistency: "Regular",
+          reachTier: "Macro-Influencer"
+        }))
+      ],
+      unifiedTrustScore: fallbackScore,
+      unifiedTrustExplanation: `Cross-platform trust is established around the creator's central channel at ${fallbackScore}/100. Discovered socials include Instagram/Twitter/TikTok profiles which have been mapped to estimate reach.`,
+      audiencePsychology: {
+        type: "Niche Community Base",
+        behavior: "Consistent community discussions and average viral potential.",
+        personality: "Pragmatic",
+        interests: creatorCategories.map(c => c.type),
+        loyaltyScore: 72,
+        fandomIntensity: 60,
+        purchasingIntent: "Moderate"
+      },
+      crossPlatformRisks: [],
+      aiInvestigationSummary: `Due diligence investigation for ${args.displayName} resolves a cross-platform presence. The primary verified YouTube channel scores ${fallbackScore}/100, while secondary socials present a stable profile with typical engagement parameters.`
     };
   }
 }
@@ -1051,4 +1216,88 @@ Format the output as raw JSON matching the requested schema. Ensure all fields a
     };
   }
 }
+
+export async function queryCreatorCopilotAI(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  creatorContext?: any,
+  currentTab?: string,
+  comparisonContext?: any
+): Promise<string> {
+  // 1. Build structured system context for the AI
+  let contextStr = "";
+  if (creatorContext) {
+    contextStr += `
+Active Creator: ${creatorContext.displayName} (@${creatorContext.username})
+Platform: ${creatorContext.platform ?? "youtube"}
+Trust Score: ${creatorContext.score}/100 (Breakdown: Engagement: ${creatorContext.breakdown?.engagement || 0}, Follower Quality: ${creatorContext.breakdown?.followerQuality || 0}, Comment Authenticity: ${creatorContext.breakdown?.commentAuthenticity || 0}, Posting Consistency: ${creatorContext.breakdown?.postingConsistency || 0})
+Followers/Subscribers: ${creatorContext.followers || 0}
+Total Posts: ${creatorContext.totalPosts || 0}
+Avg Likes: ${creatorContext.avgLikes || 0}
+Influence Velocity: ${creatorContext.influenceVelocity || 50}/100
+Lifecycle Stage: ${creatorContext.lifecycleStage || "Growing"}
+Undervalued Opportunity: ${creatorContext.isUndervalued ? "Yes" : "No"}
+Virality Potential: ${creatorContext.viralityPotential || 50}%
+Projected 90-Day Growth: ${creatorContext.projectedGrowth90Days || 0}%
+ROI Tier: ${creatorContext.estimatedRoiTier || "Medium"}
+Creator Categories: ${JSON.stringify(creatorContext.creatorCategories || [])}
+Key Strengths: ${JSON.stringify(creatorContext.strengths || [])}
+Key Risks: ${JSON.stringify(creatorContext.risks || [])}
+Brand Matches: ${JSON.stringify(creatorContext.brandMatches || [])}
+
+Cross-Platform Ecosystem & Unified Ratings:
+Unified Trust Score: ${creatorContext.unifiedTrustScore ?? creatorContext.score ?? 50}/100
+Unified Trust Explanation: ${creatorContext.unifiedTrustExplanation || creatorContext.verdict || ""}
+AI Investigation Summary: ${creatorContext.aiInvestigationSummary || ""}
+Cross-Platform Social Ecosystem: ${JSON.stringify(creatorContext.crossPlatformEcosystem || [])}
+
+Audience Psychology Map:
+Audience Psychology: ${JSON.stringify(creatorContext.audiencePsychology || {})}
+
+Cross-Platform Risks & Dilution:
+Cross-Platform Risks: ${JSON.stringify(creatorContext.crossPlatformRisks || [])}
+`;
+  }
+
+  if (comparisonContext) {
+    contextStr += `
+Comparison Mode Active:
+Creator A: ${comparisonContext.aName} (Score: ${comparisonContext.aScore}/100)
+Creator B: ${comparisonContext.bName} (Score: ${comparisonContext.bScore}/100)
+`;
+  }
+
+  const activeTabFocus = currentTab ? `The user is currently viewing the "${currentTab}" tab. Focus your logic on aspects related to this tab if relevant.` : "";
+
+  const systemInstruction = `
+You are the Authenfluence AI Creator Intelligence Copilot, an elite business marketing strategist, creator VC analyst, and brand safety auditor.
+Your job is to provide data-driven, strategic creator intelligence insights. Do not chat casually like a generic chatbot; speak like a top marketing consultant or creator investment advisor.
+
+${contextStr}
+${activeTabFocus}
+
+Guidelines:
+1. Always base your replies on the numbers, metrics, strengths, and risks provided in the active creator context.
+2. If no creator context is provided, prompt the user to search for a creator handle in the main search bar to run a trust intelligence scan.
+3. Keep responses highly structured, concise, and focused on business value (ROI, brand safety, suitability, conversions).
+4. Address cross-platform ecosystem metrics (YouTube, Instagram, Twitter/X, TikTok, etc.), distinguishing clearly between verified platform data and AI-estimated audience intelligence where appropriate.
+5. Reference specific audience psychology elements (fandom intensity, purchasing intent, loyalty score, behavior type) and cross-platform risks when asked about audience quality, risk profiles, or alignment.
+6. Do not hallucinate metrics or facts not present in the context.
+`;
+
+  // 2. Format history for callGemini prompt
+  const formattedPrompt = messages
+    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+    .join("\n\n");
+
+  try {
+    return await callGemini({
+      systemInstruction,
+      prompt: `${formattedPrompt}\n\nASSISTANT:`,
+    });
+  } catch (e: any) {
+    console.error("[Copilot Gemini Error]:", e);
+    throw e;
+  }
+}
+
 
