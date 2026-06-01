@@ -441,14 +441,26 @@ function AnalyzePage() {
           >
             <AlertCircle className="w-5 h-5 shrink-0 animate-pulse" />
             <div>
-              <span className="font-semibold">Demo Fallback Mode:</span> The live YouTube API is offline or unavailable (e.g. quota limit reached, network issue, or API key missing). Displaying simulated trust intelligence data for demonstration.
+              {result.platform === "twitter" ? (
+                <span>Twitter/X live data temporarily unavailable. Showing AI simulated insights.</span>
+              ) : (
+                <>
+                  <span className="font-semibold">Demo Fallback Mode:</span> {result.fallbackReason || `The live ${result.platform === "youtube" ? "YouTube" : result.platform === "twitter" ? "Twitter / X" : "Instagram"} API is offline or unavailable. Displaying simulated creator intelligence data for demonstration.`}
+                </>
+              )}
             </div>
           </motion.div>
         )}
         {/* Unified Forecast Header */}
-        <div className="glass-strong rounded-3xl p-5 border border-border/40 relative overflow-hidden font-normal text-xs">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
+        <div className="glass-strong rounded-3xl border border-border/40 relative overflow-hidden font-normal text-xs">
+          {result.bannerUrl && (
+            <div className="w-full h-24 overflow-hidden relative border-b border-white/5">
+              <img src={result.bannerUrl} alt="Creator Profile Banner" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="p-5 relative z-10">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
             {/* Identity Group */}
             <div className="flex items-center gap-3.5">
               <div className="relative w-12 h-12 rounded-full overflow-hidden aspect-square border border-border/40 shadow-sm shrink-0 flex items-center justify-center">
@@ -539,12 +551,13 @@ function AnalyzePage() {
                 </div>
                 <div className="text-sm font-black mt-0.5 text-emerald-400">+{result.projectedGrowth90Days ?? 15}%</div>
               </div>
-            </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        {/* Undervalued Opportunity Warning callout */}
-        {result.isUndervalued && (
+      {/* Undervalued Opportunity Warning callout */}
+      {result.isUndervalued && (
           <div className="relative overflow-hidden rounded-2xl p-[1px]" style={{ background: "linear-gradient(135deg, rgba(234, 179, 8, 0.4), rgba(249, 115, 22, 0.4))" }}>
             <div className="rounded-2xl bg-card/95 p-3.5 flex items-start gap-2.5 text-xs text-foreground/90 font-normal">
               <div className="w-6 h-6 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500 shrink-0"><Sparkles className="w-4 h-4" /></div>
@@ -1065,7 +1078,7 @@ function AnalyzePage() {
           }`}>
             {result.dataSource === "live" ? (
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            ) : result.platform === "youtube" ? (
+            ) : (result.platform === "youtube" || result.platform === "twitter") ? (
               <AlertCircle className="w-3.5 h-3.5 animate-pulse" />
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
@@ -1073,7 +1086,7 @@ function AnalyzePage() {
             <span>
               {result.dataSource === "live" 
                 ? "Live API Data" 
-                : result.platform === "youtube" 
+                : (result.platform === "youtube" || result.platform === "twitter")
                   ? "Demo Fallback Mode" 
                   : "AI-Researched Public Profile"}
             </span>
@@ -2514,14 +2527,20 @@ function AnalyzePage() {
 
     const center = { x: 200, y: 200 };
     const radius = 130;
-    const satellites = ecosystem.map((item: any, idx: number) => {
-      const angle = (2 * Math.PI * idx) / ecosystem.length;
-      return {
-        ...item,
-        x: center.x + radius * Math.cos(angle),
-        y: center.y + radius * Math.sin(angle),
-      };
-    });
+    
+    // Filter out the center verified platform to prevent hub duplication
+    const satellites = ecosystem
+      .filter((item: any) => !item.isVerifiedData)
+      .map((item: any, idx: number, arr: any[]) => {
+        const angle = (2 * Math.PI * idx) / arr.length;
+        return {
+          ...item,
+          x: center.x + radius * Math.cos(angle),
+          y: center.y + radius * Math.sin(angle),
+        };
+      });
+
+    const externalPlatforms = ecosystem.filter((item: any) => !item.isVerifiedData);
 
     const getPlatformColor = (platform: string) => {
       switch (platform.toLowerCase()) {
@@ -2614,56 +2633,62 @@ function AnalyzePage() {
           {/* Connected Profiles List */}
           <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Discovered Profiles ({ecosystem.length})
+              Discovered Profiles ({externalPlatforms.length})
             </h3>
-            {ecosystem.map((sat: any, idx: number) => {
-              const theme = getPlatformColor(sat.platform);
-              return (
-                <div key={idx} className="glass rounded-2xl p-4 border border-border/30 hover:border-primary/45 transition duration-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${theme}`}>
-                        {sat.platform}
+            {externalPlatforms.length === 0 ? (
+              <div className="glass rounded-2xl p-6 border border-border/30 text-center text-xs text-muted-foreground leading-relaxed">
+                No verified external creator platforms discovered.
+              </div>
+            ) : (
+              externalPlatforms.map((sat: any, idx: number) => {
+                const theme = getPlatformColor(sat.platform);
+                return (
+                  <div key={idx} className="glass rounded-2xl p-4 border border-border/30 hover:border-primary/45 transition duration-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${theme}`}>
+                          {sat.platform}
+                        </span>
+                        <a href={sat.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-foreground hover:text-primary hover:underline truncate max-w-[120px]">
+                          {sat.handle}
+                        </a>
+                      </div>
+                      <span className={`text-[8px] font-semibold px-2 py-0.5 rounded ${
+                        sat.isVerifiedData ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-primary/10 text-primary border border-primary/20"
+                      }`}>
+                        {sat.followersLabel}
                       </span>
-                      <a href={sat.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-foreground hover:text-primary hover:underline truncate max-w-[120px]">
-                        {sat.handle}
-                      </a>
                     </div>
-                    <span className={`text-[8px] font-semibold px-2 py-0.5 rounded ${
-                      sat.isVerifiedData ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-primary/10 text-primary border border-primary/20"
-                    }`}>
-                      {sat.followersLabel}
-                    </span>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[10px] font-normal font-mono text-muted-foreground pt-1 border-t border-white/5">
-                    <div>
-                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Followers</div>
-                      <div className="font-semibold text-foreground mt-0.5">{fmt(sat.followers)}</div>
+                    <div className="grid grid-cols-3 gap-2 text-[10px] font-normal font-mono text-muted-foreground pt-1 border-t border-white/5">
+                      <div>
+                        <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Followers</div>
+                        <div className="font-semibold text-foreground mt-0.5">{fmt(sat.followers)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Engagement</div>
+                        <div className="font-semibold text-foreground mt-0.5">{sat.engagementRate}%</div>
+                      </div>
+                      <div>
+                        <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Trust Score</div>
+                        <div className="font-bold text-primary mt-0.5">{sat.trustScore}/100</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Engagement</div>
-                      <div className="font-semibold text-foreground mt-0.5">{sat.engagementRate}%</div>
-                    </div>
-                    <div>
-                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Trust Score</div>
-                      <div className="font-bold text-primary mt-0.5">{sat.trustScore}/100</div>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-[10px] font-normal font-mono text-muted-foreground pt-1">
-                    <div>
-                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Consistency</div>
-                      <div className="font-semibold text-foreground mt-0.5">{sat.postingConsistency}</div>
-                    </div>
-                    <div>
-                      <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Reach Tier</div>
-                      <div className="font-semibold text-foreground mt-0.5">{sat.reachTier}</div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-normal font-mono text-muted-foreground pt-1">
+                      <div>
+                        <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Consistency</div>
+                        <div className="font-semibold text-foreground mt-0.5">{sat.postingConsistency}</div>
+                      </div>
+                      <div>
+                        <div className="text-[8px] uppercase font-bold text-muted-foreground/50">Reach Tier</div>
+                        <div className="font-semibold text-foreground mt-0.5">{sat.reachTier}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

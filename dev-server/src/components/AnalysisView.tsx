@@ -72,7 +72,7 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
         >
           <AlertCircle className="w-5 h-5 shrink-0 animate-pulse" />
           <div>
-            <span className="font-semibold">Demo Fallback Mode:</span> The live YouTube API is currently offline or unavailable (e.g. quota limit reached, network issue, or API key missing). Displaying simulated trust intelligence data for demonstration.
+            <span className="font-semibold">Demo Fallback Mode:</span> {analysis.fallbackReason || `The live ${analysis.platform === "youtube" ? "YouTube" : analysis.platform === "twitter" ? "Twitter / X" : "Instagram"} API is currently offline or unavailable. Displaying simulated creator intelligence data for demonstration.`}
           </div>
         </motion.div>
       )}
@@ -81,9 +81,14 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-strong rounded-3xl p-6 sm:p-8 ring-glow"
+        className="glass-strong rounded-3xl overflow-hidden ring-glow"
       >
-        <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+        {analysis.bannerUrl && (
+          <div className="w-full h-32 sm:h-44 overflow-hidden relative border-b border-white/5">
+            <img src={analysis.bannerUrl} alt="Twitter Profile Banner" className="w-full h-full object-cover" />
+          </div>
+        )}
+        <div className="p-6 sm:p-8 grid lg:grid-cols-[1fr_auto] gap-8 items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {analysis.platform === "instagram" ? (
@@ -110,16 +115,12 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
               {analysis.confidenceLevel && (
                 <ConfidenceBadge level={analysis.confidenceLevel} />
               )}
-              {analysis.platform !== "youtube" ? (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 cursor-help" title="AI-Researched Public Profile. This data has been enriched by public profile intelligence and AI research due to platform API restrictions.">
-                  <Sparkles className="w-3.5 h-3.5 mr-1" /> AI-Researched Public Profile
-                </span>
-              ) : analysis.dataSource === "live" ? (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-success/15 text-success border border-success/30 cursor-help" title="Real-time YouTube Data Verified. Verified creator metrics and real-time API synchronization.">
-                  ✓ Live YouTube Data Verified
+              {analysis.dataSource === "live" ? (
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-success/15 text-success border-success/30 cursor-help" title={`Real-time ${analysis.platform === "twitter" ? "Twitter / X" : analysis.platform === "instagram" ? "Instagram" : "YouTube"} Data Verified. Verified creator metrics and real-time API synchronization.`}>
+                  ✓ Live {analysis.platform === "twitter" ? "Twitter / X" : analysis.platform === "instagram" ? "Instagram" : "YouTube"} Data Verified
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-warning/15 text-warning border border-warning/30 cursor-help" title="The live YouTube API is currently offline or unavailable. Displaying simulated trust intelligence data for demonstration.">
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-warning/15 text-warning border-warning/30 cursor-help" title={`The live ${analysis.platform === "twitter" ? "Twitter / X" : analysis.platform === "instagram" ? "Instagram" : "YouTube"} API is currently offline or unavailable. Displaying simulated trust intelligence data for demonstration.`}>
                   <AlertCircle className="w-3.5 h-3.5 mr-1 animate-pulse" /> Demo Fallback Mode
                 </span>
               )}
@@ -172,11 +173,51 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
               </div>
             )}
 
+            {/* Profile Metadata */}
+            {(analysis.location || analysis.createdAt || analysis.bio || analysis.followingCount !== undefined || analysis.websiteUrl) && (
+              <div className="space-y-2 pt-4 border-t border-border/20 text-xs mt-4">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground font-mono">Profile Details</div>
+                <div className="space-y-1.5 font-normal text-muted-foreground">
+                  {analysis.bio && (
+                    <p className="text-xs text-foreground/90 italic mb-2.5 max-w-xl leading-relaxed">"{analysis.bio}"</p>
+                  )}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                    {analysis.followingCount !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5 shrink-0" />
+                        <span><strong className="text-foreground">{fmt(analysis.followingCount)}</strong> Following</span>
+                      </div>
+                    )}
+                    {analysis.location && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px]">📍</span>
+                        <span>{analysis.location}</span>
+                      </div>
+                    )}
+                    {analysis.createdAt && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px]">📅</span>
+                        <span>Joined {new Date(analysis.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}</span>
+                      </div>
+                    )}
+                    {analysis.websiteUrl && (
+                      <div className="flex items-center gap-1">
+                        <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <a href={analysis.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate max-w-[200px]">
+                          {analysis.websiteUrl.replace(/https?:\/\/(www\.)?/, "")}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-4 mt-6 max-w-md">
               {[
-                { Icon: Users, label: "Followers", value: fmt(analysis.followers) },
+                { Icon: Users, label: analysis.platform === "twitter" ? "Followers" : "Followers", value: fmt(analysis.followers) },
                 { Icon: Heart, label: "Avg Likes", value: fmt(analysis.avgLikes) },
-                { Icon: FileText, label: "Published Videos", value: fmt(analysis.totalPosts) },
+                { Icon: FileText, label: analysis.platform === "twitter" ? "Tweets" : "Published Videos", value: fmt(analysis.totalPosts) },
               ].map((s) => (
                 <div key={s.label} className="glass rounded-xl p-3 flex flex-col justify-between">
                   <div>
@@ -184,8 +225,8 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
                     <div className="text-lg font-semibold tabular-nums">{s.value}</div>
                     <div className="text-[11px] text-muted-foreground">{s.label}</div>
                   </div>
-                  <div className="text-[9px] text-muted-foreground/50 mt-2 border-t border-border/10 pt-1.5">
-                    Source: YouTube API
+                  <div className="text-[9px] text-muted-foreground/50 mt-2 border-t border-border/10 pt-1.5 font-mono">
+                    Source: {analysis.platform === "twitter" ? "Twitter API" : "YouTube API"}
                   </div>
                 </div>
               ))}

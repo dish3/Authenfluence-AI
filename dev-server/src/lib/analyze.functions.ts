@@ -2,6 +2,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { analyzeMock, type InfluencerAnalysis } from "./mock-data";
 
+export const MOCK_TWITTER_DATA = {
+  username: "sample_creator",
+  followers: 182000,
+  engagementRate: 4.2,
+  trustScore: 87,
+  authenticityScore: 91,
+  avgLikes: 8200,
+  avgComments: 540,
+  avgRetweets: 1200,
+  aiVerdict: "Healthy engagement and authentic audience detected."
+};
+
 // Build a 14-day engagement series from real or synthesized data.
 function buildSeries(
   recentVideos: Array<{ publishedAt: string; likes: number; comments: number }>,
@@ -41,6 +53,38 @@ function formatUncertaintyFactors(factors: {
   return out;
 }
 
+function isFallbackWarranted(err: any): { warranted: boolean; reason: string } {
+  const msg = (err?.message || "").toLowerCase();
+  
+  if (!process.env.TWITTER_CONSUMER_KEY || !process.env.TWITTER_CONSUMER_SECRET) {
+    return { warranted: true, reason: "Twitter API credentials (TWITTER_CONSUMER_KEY / TWITTER_CONSUMER_SECRET) are missing from server environment." };
+  }
+  
+  if (
+    msg.includes("402") || 
+    msg.includes("creditsdepleted") || 
+    msg.includes("credits depleted") || 
+    msg.includes("no have any credits") || 
+    msg.includes("payment")
+  ) {
+    return { warranted: true, reason: "Twitter/X live data temporarily unavailable. Showing AI simulated insights." };
+  }
+  
+  if (msg.includes("429") || msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("quota")) {
+    return { warranted: true, reason: "Twitter API rate limit reached or quota limits exhausted (HTTP 429)." };
+  }
+  
+  if (msg.includes("fetch failed") || msg.includes("network") || msg.includes("dns") || msg.includes("timeout") || msg.includes("econnrefused")) {
+    return { warranted: true, reason: "Network request failed while connecting to Twitter API." };
+  }
+  
+  if (msg.includes("invalid response") || msg.includes("not found") || msg.includes("empty response") || msg.includes("unexpected token") || msg.includes("json")) {
+    return { warranted: true, reason: "Invalid response or data structure received from Twitter API." };
+  }
+  
+  return { warranted: true, reason: "Twitter/X live data temporarily unavailable. Showing AI simulated insights." };
+}
+
 async function runRealAnalysis(
   username: string,
   platform?: "youtube" | "instagram" | "twitter"
@@ -48,6 +92,97 @@ async function runRealAnalysis(
   const isFallbackPlatform = platform === "instagram" || platform === "twitter";
   
   if (isFallbackPlatform) {
+    if (platform === "twitter") {
+      const hasKeys = !!(process.env.TWITTER_CONSUMER_KEY && process.env.TWITTER_CONSUMER_SECRET);
+      if (!hasKeys) {
+        console.log(`[Twitter Fallback] API Keys missing. Loading demo profile...`);
+        const { generatePlatformFallbackAnalysis } = await import("./services/gemini.server");
+        const analysis = await generatePlatformFallbackAnalysis(username, platform);
+        return {
+          ...analysis,
+          fallbackReason: "Twitter API credentials (TWITTER_CONSUMER_KEY / TWITTER_CONSUMER_SECRET) are missing from server environment."
+        };
+      }
+      
+      try {
+        console.log(`[Twitter Real-Time] Executing API scan for: ${username}`);
+        const { analyzeTwitterCreator } = await import("./services/twitter.server");
+        return await analyzeTwitterCreator(username);
+      } catch (twitterErr: any) {
+        const check = isFallbackWarranted(twitterErr);
+        console.log(`[Twitter Fallback] Real-time scan failed with error: ${twitterErr.message}. Loading fallback profile...`);
+        
+        const { generatePlatformFallbackAnalysis } = await import("./services/gemini.server");
+        
+        // Ground in MOCK_TWITTER_DATA metrics
+        const mockRealData = {
+          followers: MOCK_TWITTER_DATA.followers,
+          avgLikes: MOCK_TWITTER_DATA.avgLikes,
+          totalPosts: 312,
+          score: MOCK_TWITTER_DATA.trustScore,
+          breakdown: {
+            engagement: Math.round(MOCK_TWITTER_DATA.engagementRate * 20),
+            followerQuality: MOCK_TWITTER_DATA.authenticityScore,
+            commentAuthenticity: MOCK_TWITTER_DATA.authenticityScore,
+            postingConsistency: 85
+          },
+          displayName: username.split(/[-_.]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" "),
+          verified: false,
+          bio: MOCK_TWITTER_DATA.aiVerdict,
+          createdAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()
+        };
+
+        const analysis = await generatePlatformFallbackAnalysis(username, "twitter", mockRealData);
+        return {
+          ...analysis,
+          username: username.replace(/^@/, ""),
+          displayName: analysis.displayName || username.split(/[-_.]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" "),
+          followers: MOCK_TWITTER_DATA.followers,
+          avgLikes: MOCK_TWITTER_DATA.avgLikes,
+          score: MOCK_TWITTER_DATA.trustScore,
+          verdict: MOCK_TWITTER_DATA.aiVerdict,
+          fallbackReason: check.reason,
+          dataSource: "fallback",
+          
+          // Fallback detailed data grounding
+          breakdown: {
+            engagement: Math.round(MOCK_TWITTER_DATA.engagementRate * 20),
+            followerQuality: MOCK_TWITTER_DATA.authenticityScore,
+            commentAuthenticity: MOCK_TWITTER_DATA.authenticityScore,
+            postingConsistency: 85
+          },
+          engagementRate: MOCK_TWITTER_DATA.engagementRate,
+          
+          commentAuthenticityDetailed: {
+            lowAuthenticityPct: 100 - MOCK_TWITTER_DATA.authenticityScore,
+            reason: "Mock simulation checks for automated comment patterns.",
+            spamPct: 4,
+            repetitivePct: 3,
+            emojiSpamPct: 2,
+            botLanguagePct: 1,
+            organicPct: MOCK_TWITTER_DATA.authenticityScore
+          },
+          
+          crossPlatformEcosystem: [
+            {
+              platform: "Twitter/X",
+              handle: `@${username.replace(/^@/, "")}`,
+              url: `https://twitter.com/${username.replace(/^@/, "")}`,
+              isVerifiedData: false,
+              followers: MOCK_TWITTER_DATA.followers,
+              followersLabel: "AI-Simulated Audience Intelligence",
+              engagementRate: MOCK_TWITTER_DATA.engagementRate,
+              engagementLabel: "AI-Simulated Audience Intelligence",
+              trustScore: MOCK_TWITTER_DATA.trustScore,
+              botLikelihood: 100 - MOCK_TWITTER_DATA.authenticityScore,
+              postingConsistency: "Regular",
+              reachTier: MOCK_TWITTER_DATA.followers >= 1_000_000 ? "Mega-Influencer" : MOCK_TWITTER_DATA.followers >= 100_000 ? "Macro-Influencer" : "Micro-Influencer"
+            }
+          ]
+        };
+      }
+    }
+    
     try {
       const { generatePlatformFallbackAnalysis } = await import("./services/gemini.server");
       return await generatePlatformFallbackAnalysis(username, platform);
@@ -141,7 +276,7 @@ async function runRealAnalysis(
 
     const selectedChannel = meta;
     console.log("SELECTED CHANNEL:", selectedChannel);
-    const discoveredSocials = await discoverEcosystemLinks(meta.description || "");
+    const discoveredSocials = await discoverEcosystemLinks(meta.channelId, meta.handle, meta.description || "");
     console.log("[DEBUG] DISCOVERED SOCIALS:", discoveredSocials);
 
     console.log("LIVE CHANNEL DATA", meta);
@@ -212,6 +347,7 @@ async function runRealAnalysis(
         confidenceLevel: score.confidenceLevel,
         creatorCategories: score.creatorCategories,
         discoveredSocials,
+        youtubeHandle: meta.handle,
       });
       console.log("AI RESPONSE", aiResponse);
 
@@ -453,6 +589,12 @@ export const analyzeInfluencer = createServerFn({ method: "POST" })
     }).parse(data)
   )
   .handler(async ({ data }) => {
+    try {
+      const { loadEnv } = await import("./services/env.server");
+      await loadEnv();
+    } catch (e) {
+      console.warn("Failed to load environment variables at request time:", e);
+    }
     const isYouTube = data.platform === "youtube" || !data.platform;
     try {
       const real = await runRealAnalysis(data.username, data.platform);
@@ -464,13 +606,11 @@ export const analyzeInfluencer = createServerFn({ method: "POST" })
         throw new Error("YouTube API returned empty analysis.");
       }
     } catch (e: any) {
-      if (isYouTube) {
-        console.error("[DEBUG] Live YouTube API failed during resolution:", e);
-        throw new Error(`Live YouTube API failed: ${e.message}`);
-      }
+      console.error(`[analyzeInfluencer] Analysis failed during resolution for platform ${data.platform || "youtube"}:`, e);
+      throw e;
     }
 
-    if (data.platform === "instagram" || data.platform === "twitter") {
+    if (data.platform === "instagram") {
       const { generatePlatformFallbackAnalysis } = await import("./services/gemini.server");
       return await generatePlatformFallbackAnalysis(data.username, data.platform);
     }
@@ -482,6 +622,12 @@ export const compareInfluencers = createServerFn({ method: "POST" })
     z.object({ a: z.string().min(1).max(80), b: z.string().min(1).max(80) }).parse(data)
   )
   .handler(async ({ data }) => {
+    try {
+      const { loadEnv } = await import("./services/env.server");
+      await loadEnv();
+    } catch (e) {
+      console.warn("Failed to load environment variables at request time:", e);
+    }
     try {
       const [aRes, bRes] = await Promise.all([
         runRealAnalysis(data.a),
@@ -535,6 +681,12 @@ export const askCreatorCopilot = createServerFn({ method: "POST" })
     }).parse(data)
   )
   .handler(async ({ data }) => {
+    try {
+      const { loadEnv } = await import("./services/env.server");
+      await loadEnv();
+    } catch (e) {
+      console.warn("Failed to load environment variables at request time:", e);
+    }
     try {
       const { queryCreatorCopilotAI } = await import("./services/gemini.server");
       const reply = await queryCreatorCopilotAI(

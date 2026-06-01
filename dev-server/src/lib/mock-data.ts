@@ -134,6 +134,15 @@ export interface InfluencerAnalysis {
   };
   ecosystemNodes?: Array<{ name: string; type: string; overlapPct: number }>;
   intelligenceFeed?: string[];
+  
+  // Real-time Twitter/X and Fallback attributes
+  bannerUrl?: string;
+  followingCount?: number;
+  bio?: string;
+  location?: string;
+  createdAt?: string;
+  websiteUrl?: string;
+  fallbackReason?: string;
 }
 
 const series = (base: number, vol: number) =>

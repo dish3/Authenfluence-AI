@@ -3,6 +3,7 @@ import type { RawChannelSignals } from "./scoring";
 
 const BASE = "https://www.googleapis.com/youtube/v3";
 
+
 async function yt<T>(path: string, params: Record<string, string>, key: string): Promise<T> {
   const url = new URL(`${BASE}/${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -293,42 +294,177 @@ export interface DiscoveredSocial {
   handle: string;
 }
 
+export function extractHandleFromUrl(urlStr: string, platform: string): string | null {
+  try {
+    // Standardize URL
+    let cleanUrl = urlStr.trim().split("?")[0].replace(/\/+$/, "");
+    
+    // Remove protocol and www.
+    cleanUrl = cleanUrl.replace(/^(https?:\/\/)?(www\.)?/, "");
+    
+    // Split into parts
+    const parts = cleanUrl.split("/");
+    if (parts.length < 2) return null;
+    
+    let handleCandidate = "";
+    const domain = parts[0].toLowerCase();
+    
+    if (domain.includes("instagram.com")) {
+      handleCandidate = parts[1];
+    } else if (domain.includes("twitter.com") || domain.includes("x.com")) {
+      handleCandidate = parts[1];
+    } else if (domain.includes("tiktok.com")) {
+      handleCandidate = parts[1];
+      if (handleCandidate.startsWith("@")) {
+        handleCandidate = handleCandidate.slice(1);
+      }
+    } else if (domain.includes("spotify.com")) {
+      if (parts[1] === "artist" || parts[1] === "user") {
+        handleCandidate = parts[2] || "";
+      } else {
+        handleCandidate = parts[1];
+      }
+    } else if (domain.includes("discord.gg") || domain.includes("discord.com")) {
+      if (parts[1] === "invite") {
+        handleCandidate = parts[2] || "";
+      } else {
+        handleCandidate = parts[1];
+      }
+    } else if (domain.includes("twitch.tv")) {
+      handleCandidate = parts[1];
+    } else if (domain.includes("linkedin.com")) {
+      if (parts[1] === "in" || parts[1] === "company" || parts[1] === "school") {
+        handleCandidate = parts[2] || "";
+      } else {
+        handleCandidate = parts[1];
+      }
+    } else if (domain.includes("facebook.com")) {
+      handleCandidate = parts[1];
+    } else if (domain.includes("linktr.ee")) {
+      handleCandidate = parts[1];
+    } else {
+      handleCandidate = parts[1] || "";
+    }
+    
+    handleCandidate = handleCandidate.trim();
+    if (!handleCandidate) return null;
+    
+    const lower = handleCandidate.toLowerCase();
+    
+    const IGNORED_HANDLES = new Set([
+      "p", "reels", "stories", "explore", "developer", "about", "legal", "terms", "privacy", "jobs", "directory", 
+      "blog", "press", "careers", "home", "index", "search", "settings", "profile", "post", "video", "status", 
+      "groups", "pages", "sharer", "share", "people", "events", "login", "recover", "help", "policies", 
+      "channel", "c", "user", "watch", "playlist", "results", "feed", "hashtag", "in", "company", "posts", 
+      "learning", "artist", "track", "album", "show", "episode", "tag", "embed", "music", "trending", 
+      "foryou", "discover", "privacy-policy", "support", "faq", "contact", "tos", "personalization",
+      "r.php", "invite"
+    ]);
+    
+    if (IGNORED_HANDLES.has(lower)) return null;
+    if (!/^[a-zA-Z0-9_.-]+$/.test(handleCandidate)) return null;
+    
+    return handleCandidate;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchYouTubePageHTML(channelId: string, handle: string): Promise<string> {
+  const cleanHandle = handle.replace(/^@/, "");
+  const urls: string[] = [];
+  
+  if (cleanHandle) {
+    urls.push(`https://www.youtube.com/@${cleanHandle}`);
+    urls.push(`https://www.youtube.com/@${cleanHandle}/about`);
+  }
+  if (channelId) {
+    urls.push(`https://www.youtube.com/channel/${channelId}`);
+    urls.push(`https://www.youtube.com/channel/${channelId}/about`);
+  }
+  
+  console.log(`[YouTube Scraper] Fetching channel HTML from candidates:`, urls);
+  
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+  ];
+  
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": userAgents[Math.floor(Math.random() * userAgents.length)],
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9"
+        }
+      });
+      if (res.ok) {
+        const html = await res.text();
+        if (html && (html.includes("ytInitialData") || html.includes("instagram.com") || html.includes("twitter.com"))) {
+          console.log(`[YouTube Scraper] Successfully fetched HTML from ${url} (length: ${html.length})`);
+          return html;
+        }
+      }
+    } catch (err) {
+      console.warn(`[YouTube Scraper] Failed to fetch HTML from ${url}:`, err);
+    }
+  }
+  
+  return "";
+}
+
 export function extractSocialLinks(text: string): DiscoveredSocial[] {
   const discovered: DiscoveredSocial[] = [];
   
-  const extractHandle = (url: string, platform: string) => {
-    try {
-      const cleanUrl = url.split("?")[0].replace(/\/+$/, "");
-      const parts = cleanUrl.split("/");
-      let h = parts[parts.length - 1];
-      if (h.startsWith("@")) h = h.slice(1);
-      return h;
-    } catch {
-      return "profile";
-    }
-  };
-
+  // Replace backslash escaped slashes to handle JSON-encoded URLs in HTML script blocks
+  const unescaped = text.replace(/\\\/|\\/g, "/");
+  
+  const urlRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|tiktok\.com|twitter\.com|x\.com|spotify\.com|discord\.gg|discord\.com|twitch\.tv|linktr\.ee|facebook\.com|linkedin\.com)\/[a-zA-Z0-9_\-\.\/@?=&%#]+/gi;
+  
+  const matches = unescaped.match(urlRegex) || [];
+  
   const platforms = [
-    { name: "Instagram", regex: /(https?:\/\/)?(www\.)?instagram\.com\/([a-zA-Z0-9_.-]+)/gi },
-    { name: "Twitter/X", regex: /(https?:\/\/)?(www\.)?(twitter|x)\.com\/([a-zA-Z0-9_.-]+)/gi },
-    { name: "TikTok", regex: /(https?:\/\/)?(www\.)?tiktok\.com\/@([a-zA-Z0-9_.-]+)/gi },
-    { name: "Spotify", regex: /(https?:\/\/)?(www\.)?(open\.)?spotify\.com\/(artist|user)\/([a-zA-Z0-9_-]+)/gi },
-    { name: "Discord", regex: /(https?:\/\/)?(www\.)?(discord\.gg|discord\.com\/invite)\/([a-zA-Z0-9_-]+)/gi },
-    { name: "Twitch", regex: /(https?:\/\/)?(www\.)?twitch\.tv\/([a-zA-Z0-9_.-]+)/gi },
-    { name: "LinkedIn", regex: /(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/([a-zA-Z0-9_.-]+)/gi },
-    { name: "Facebook", regex: /(https?:\/\/)?(www\.)?facebook\.com\/([a-zA-Z0-9_.-]+)/gi },
+    { name: "Instagram", domain: "instagram.com" },
+    { name: "TikTok", domain: "tiktok.com" },
+    { name: "Twitter/X", domain: "twitter.com" },
+    { name: "Twitter/X", domain: "x.com" },
+    { name: "Spotify", domain: "spotify.com" },
+    { name: "Discord", domain: "discord.gg" },
+    { name: "Discord", domain: "discord.com" },
+    { name: "Twitch", domain: "twitch.tv" },
+    { name: "Linktree", domain: "linktr.ee" },
+    { name: "Facebook", domain: "facebook.com" },
+    { name: "LinkedIn", domain: "linkedin.com" }
   ];
 
-  for (const p of platforms) {
-    const matches = [...text.matchAll(p.regex)];
-    for (const match of matches) {
-      const url = match[0];
-      const handle = extractHandle(url, p.name);
-      if (handle && handle !== "channel" && handle !== "c" && handle !== "user") {
-        if (!discovered.some(d => d.url === url || (d.platform === p.name && d.handle === `@${handle}`))) {
-          discovered.push({ platform: p.name, url, handle: `@${handle}` });
-        }
-      }
+  for (const match of matches) {
+    const lowerMatch = match.toLowerCase();
+    const platformInfo = platforms.find(p => lowerMatch.includes(p.domain));
+    if (!platformInfo) continue;
+    
+    let fullUrl = match;
+    if (!/^https?:\/\//i.test(fullUrl)) {
+      fullUrl = `https://${fullUrl}`;
+    }
+    
+    const handle = extractHandleFromUrl(fullUrl, platformInfo.name);
+    if (!handle) continue;
+    
+    const cleanUrl = fullUrl.split("?")[0].replace(/\/+$/, "");
+    
+    const hasDup = discovered.some(d => 
+      d.platform === platformInfo.name && 
+      d.handle.toLowerCase() === `@${handle.toLowerCase()}`
+    );
+    
+    if (!hasDup) {
+      discovered.push({
+        platform: platformInfo.name,
+        url: cleanUrl,
+        handle: `@${handle}`
+      });
     }
   }
 
@@ -338,6 +474,7 @@ export function extractSocialLinks(text: string): DiscoveredSocial[] {
 export async function crawlLinktree(linktreeUrl: string): Promise<DiscoveredSocial[]> {
   try {
     const formattedUrl = linktreeUrl.startsWith("http") ? linktreeUrl : `https://${linktreeUrl}`;
+    console.log(`[Linktree Crawler] Crawling Linktree: ${formattedUrl}`);
     const res = await fetch(formattedUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -352,31 +489,68 @@ export async function crawlLinktree(linktreeUrl: string): Promise<DiscoveredSoci
   }
 }
 
-export async function discoverEcosystemLinks(description: string): Promise<DiscoveredSocial[]> {
-  const directLinks = extractSocialLinks(description);
+export async function discoverEcosystemLinks(
+  channelId: string,
+  handle: string,
+  description: string
+): Promise<DiscoveredSocial[]> {
+  console.log(`[Ecosystem Discovery] Running for channelId: ${channelId}, handle: ${handle}`);
   
-  // Find Linktree or similar links in description
-  const linktreeRegex = /(https?:\/\/)?(www\.)?linktr\.ee\/([a-zA-Z0-9_-]+)/gi;
-  const linktreeMatches = [...description.matchAll(linktreeRegex)];
+  const pageHtml = await fetchYouTubePageHTML(channelId, handle);
+  const htmlLinks = pageHtml ? extractSocialLinks(pageHtml) : [];
+  const descLinks = extractSocialLinks(description);
   
-  if (linktreeMatches.length > 0) {
+  const directLinks = [...htmlLinks];
+  for (const item of descLinks) {
+    if (!directLinks.some(d => d.platform === item.platform && d.handle.toLowerCase() === item.handle.toLowerCase())) {
+      directLinks.push(item);
+    }
+  }
+  
+  console.log(`[Ecosystem Discovery] Discovered direct links:`, directLinks);
+  
+  const linktreeUrls: string[] = [];
+  for (const item of directLinks) {
+    if (item.platform === "Linktree") {
+      linktreeUrls.push(item.url);
+    }
+  }
+  
+  const linktreeRegex = /(?:https?:\/\/)?(?:www\.)?linktr\.ee\/[a-zA-Z0-9_-]+/gi;
+  const matches = [
+    ...(description.match(linktreeRegex) || []),
+    ...(pageHtml ? (pageHtml.match(linktreeRegex) || []) : [])
+  ];
+  
+  for (const m of matches) {
+    let url = m;
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+    const cleanUrl = url.split("?")[0].replace(/\/+$/, "");
+    if (!linktreeUrls.includes(cleanUrl)) {
+      linktreeUrls.push(cleanUrl);
+    }
+  }
+  
+  if (linktreeUrls.length > 0) {
+    console.log(`[Ecosystem Discovery] Discovered Linktree links to crawl:`, linktreeUrls);
     const crawledResults = await Promise.all(
-      linktreeMatches.map(m => crawlLinktree(m[0]))
+      linktreeUrls.map(url => crawlLinktree(url))
     );
     
-    // Combine and deduplicate
-    const combined = [...directLinks];
     for (const list of crawledResults) {
       for (const item of list) {
-        if (!combined.some(d => d.platform === item.platform && d.handle === item.handle)) {
-          combined.push(item);
+        if (!directLinks.some(d => d.platform === item.platform && d.handle.toLowerCase() === item.handle.toLowerCase())) {
+          directLinks.push(item);
         }
       }
     }
-    return combined;
   }
   
-  return directLinks;
+  const finalSocials = directLinks.filter(d => d.platform !== "Linktree");
+  console.log(`[Ecosystem Discovery] Final discovered socials for ${handle}:`, finalSocials);
+  return finalSocials;
 }
 
 
