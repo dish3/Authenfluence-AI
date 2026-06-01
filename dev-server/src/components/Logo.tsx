@@ -11,8 +11,8 @@ export function Logo() {
         </div>
       </div>
       <div className="leading-tight">
-        <div className="font-semibold tracking-tight">Authenfluence <span className="gradient-text">AI</span></div>
-        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Trust Intelligence</div>
+        <div className="font-semibold tracking-tight">Ratefluencer <span className="gradient-text">AI</span></div>
+        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Ecosystem Intelligence</div>
       </div>
     </Link>
   );

@@ -47,9 +47,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Authenfluence AI — Influencer Trust Intelligence" },
+      { title: "Ratefluencer AI — Creator Intelligence Operating System" },
       { name: "description", content: "AI-powered influencer authenticity and fraud detection. We measure trust, not popularity." },
-      { property: "og:title", content: "Authenfluence AI — Influencer Trust Intelligence" },
+      { property: "og:title", content: "Ratefluencer AI — Creator Intelligence Operating System" },
       { property: "og:description", content: "AI-powered digital trust intelligence for influencer marketing." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -13,7 +13,7 @@ interface BreakdownItem {
 const ITEMS: BreakdownItem[] = [
   {
     key: "engagement",
-    label: "Influence Reliability",
+    label: "Engagement Score",
     weight: 30,
     Icon: Heart,
     insight: (v, cats) => {
@@ -28,7 +28,7 @@ const ITEMS: BreakdownItem[] = [
   },
   {
     key: "followerQuality",
-    label: "Audience Trust Quality",
+    label: "Audience Quality Score",
     weight: 25,
     Icon: Users,
     insight: (v) => {
@@ -39,7 +39,7 @@ const ITEMS: BreakdownItem[] = [
   },
   {
     key: "commentAuthenticity",
-    label: "Comment Authenticity",
+    label: "Authenticity Score",
     weight: 20,
     Icon: MessageSquare,
     insight: (v, cats) => {
@@ -54,7 +54,7 @@ const ITEMS: BreakdownItem[] = [
   },
   {
     key: "postingConsistency",
-    label: "Creator Stability",
+    label: "Posting Consistency",
     weight: 15,
     Icon: Calendar,
     insight: (v) => {
@@ -65,13 +65,13 @@ const ITEMS: BreakdownItem[] = [
   },
   {
     key: "contextualSignals",
-    label: "Contextual Trust Signals",
+    label: "Brand Safety Score",
     weight: 10,
     Icon: Sparkles,
     insight: (v) => {
-      if (v >= 70) return "High alignment with real-time temporal markers and creator context benchmarks.";
-      if (v >= 45) return "Standard contextual alignment — mild variance in recent upload patterns.";
-      return "Unusual variance detected relative to benchmark category context.";
+      if (v >= 70) return "High alignment with real-time temporal markers and creator safety benchmarks.";
+      if (v >= 45) return "Standard contextual alignment — mild variance in safety and upload patterns.";
+      return "Unusual variance detected relative to safety and benchmark category context.";
     },
   },
 ];

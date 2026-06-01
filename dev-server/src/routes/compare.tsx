@@ -20,7 +20,7 @@ export const Route = createFileRoute("/compare")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Compare Influencers — Authenfluence AI" },
+      { title: "Compare Influencers — Ratefluencer AI" },
       { name: "description", content: "Compare authenticity and trust between two influencers side-by-side." },
     ],
   }),
@@ -115,7 +115,7 @@ function ComparePage() {
               >
                 {winner === idx && (
                   <div className="absolute -top-3 left-6 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full gradient-bg text-white text-[11px] font-medium">
-                    <Trophy className="w-3 h-3" /> Higher Trust
+                    <Trophy className="w-3 h-3" /> Higher Score
                   </div>
                 )}
                 <div className="flex items-center justify-between">
@@ -123,11 +123,22 @@ function ComparePage() {
                     <div className="font-semibold text-lg">{p.displayName}</div>
                     <div className="text-xs text-muted-foreground">@{p.username}</div>
                   </div>
-                  {p.dataSource === "fallback" && (
-                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-warning/15 text-warning border border-warning/30">
-                      <FlaskConical className="w-3 h-3" /> demo
-                    </span>
-                  )}
+                  <span className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border font-mono font-bold uppercase ${
+                    p.dataSource === "live" 
+                      ? "bg-success/10 text-success border-success/20" 
+                      : p.dataSource === "fallback"
+                        ? "bg-rose-500/10 text-rose-450 border-rose-500/20"
+                        : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                      p.dataSource === "live" 
+                        ? "bg-success" 
+                        : p.dataSource === "fallback" 
+                          ? "bg-rose-500" 
+                          : "bg-amber-500"
+                    }`} />
+                    {p.dataSource === "live" ? "VERIFIED" : p.dataSource === "fallback" ? "FALLBACK" : "ESTIMATED"}
+                  </span>
                 </div>
                 <div className="flex justify-center my-4">
                   <ScoreRing score={p.score} size={180} />
@@ -147,20 +158,25 @@ function ComparePage() {
             <h3 className="font-semibold text-lg flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" /> Multi-Dimensional Predictive Match Matrix
             </h3>
-            <p className="text-xs text-muted-foreground">Detailed comparative vectors evaluated by Authenfluence AI models</p>
+            <p className="text-xs text-muted-foreground">Detailed comparative vectors evaluated by Ratefluencer AI models</p>
 
             <div className="space-y-4 pt-2">
               {[
-                { name: "Overall Trust Score", key: "score", format: (v: number) => `${v}/100`, max: 100 },
-                { name: "Growth Potential Score", key: "growthPotentialScore", format: (v: number) => `${v}/100`, max: 100 },
-                { name: "Campaign Success Probability", key: "campaignSuccessProbability", format: (v: number) => `${v}%`, max: 100 },
-                { name: "Comment Authenticity (Organic %)", key: "commentAuthenticityDetailed", format: (v: any) => `${v.organicPct}%`, valExtractor: (v: any) => v.commentAuthenticityDetailed?.organicPct || 75, max: 100 },
-                { name: "Posting Consistency", key: "breakdown", format: (v: any) => `${v.postingConsistency}/100`, valExtractor: (v: any) => v.breakdown?.postingConsistency || 80, max: 100 },
+                { name: "Ratefluencer Score™", key: "score", format: (v: number) => `${v}/100`, max: 100 },
+                { name: "Engagement", key: "breakdown", format: (v: number) => `${v}/100`, valExtractor: (v: any) => v.breakdown?.engagement ?? 80, max: 100 },
+                { name: "Audience Quality", key: "breakdown", format: (v: number) => `${v}/100`, valExtractor: (v: any) => v.breakdown?.followerQuality ?? 80, max: 100 },
+                { name: "Virality", key: "viralityPotential", format: (v: number) => `${v}/100`, valExtractor: (v: any) => v.viralityPotential ?? 75, max: 100 },
+                { name: "Authenticity", key: "breakdown", format: (v: number) => `${v}/100`, valExtractor: (v: any) => v.breakdown?.commentAuthenticity ?? 80, max: 100 },
+                { name: "Growth", key: "projectedGrowth90Days", format: (v: number) => `+${v}%`, valExtractor: (v: any) => v.projectedGrowth90Days ?? 12, max: 100 },
+                { name: "Campaign Suitability", key: "campaignSuccessProbability", format: (v: number) => `${v}%`, valExtractor: (v: any) => v.campaignSuccessProbability ?? 85, max: 100 },
+                { name: "Brand Fit", key: "brandMatches", format: (v: number) => `${v}%`, valExtractor: (v: any) => v.brandMatches?.[0]?.score ?? Math.round((v.score ?? 80) * 0.95), max: 100 },
               ].map((row) => {
-                const valA = row.valExtractor ? row.valExtractor(pair.a) : (pair.a as any)[row.key];
-                const valB = row.valExtractor ? row.valExtractor(pair.b) : (pair.b as any)[row.key];
-                const labelA = row.format(row.valExtractor ? pair.a : (pair.a as any)[row.key]);
-                const labelB = row.format(row.valExtractor ? pair.b : (pair.b as any)[row.key]);
+                const valRawA = row.valExtractor ? row.valExtractor(pair.a) : (pair.a as any)[row.key];
+                const valRawB = row.valExtractor ? row.valExtractor(pair.b) : (pair.b as any)[row.key];
+                const valA = typeof valRawA === "number" && !isNaN(valRawA) ? valRawA : 0;
+                const valB = typeof valRawB === "number" && !isNaN(valRawB) ? valRawB : 0;
+                const labelA = row.format(valA);
+                const labelB = row.format(valB);
 
                 return (
                   <div key={row.name} className="grid grid-cols-[1fr_2fr_1fr] gap-4 items-center border-b border-border/20 pb-3 last:border-b-0 last:pb-0 font-normal">
@@ -175,14 +191,14 @@ function ComparePage() {
                         <div className="flex-1 bg-muted/30 rounded-full h-2 overflow-hidden flex justify-end">
                           <div 
                             className="bg-primary h-full rounded-l-full"
-                            style={{ width: `${(valA / row.max) * 100}%` }}
+                            style={{ width: `${((valA ?? 0) / row.max) * 100}%` }}
                           />
                         </div>
                         <div className="w-1.5 h-1.5 rounded-full bg-border" />
                         <div className="flex-1 bg-muted/30 rounded-full h-2 overflow-hidden">
                           <div 
                             className="bg-purple-500 h-full rounded-r-full"
-                            style={{ width: `${(valB / row.max) * 100}%` }}
+                            style={{ width: `${((valB ?? 0) / row.max) * 100}%` }}
                           />
                         </div>
                       </div>

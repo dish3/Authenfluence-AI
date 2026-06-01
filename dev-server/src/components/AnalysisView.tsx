@@ -45,7 +45,7 @@ function TrendIcon({ trend }: { trend: string }) {
   return <Info className="w-3.5 h-3.5 text-muted-foreground" />;
 }
 
-const isValidAvatar = (url?: string | null) => {
+const isValidAvatar = (url?: string | null): url is string => {
   return typeof url === "string" && url.trim().length > 0 && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("//"));
 };
 
