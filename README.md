@@ -2,6 +2,7 @@
 
 Ratefluencer AI — We measure trust, not popularity.
 
+Prototype link: https://authenfluence-ai.onrender.com/
 Live demo: https://authenfluence-ai.onrender.com/
 
 Authenfluence AI is a creator trust intelligence platform for brands, agencies, and creators. It combines YouTube data, engagement signals, fraud detection, and AI-powered reasoning to help users evaluate creator authenticity with clear, explainable trust scores.
