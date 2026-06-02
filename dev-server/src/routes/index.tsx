@@ -8,7 +8,7 @@ import { ScoreRing } from "@/components/ScoreRing";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Authenfluence AI — We measure trust, not popularity" },
+      { title: "Ratefluencer AI — We measure trust, not popularity" },
       { name: "description", content: "AI-powered digital trust intelligence for the creator economy. Evaluate whether creator influence is trustworthy, sustainable, and authentic." },
     ],
   }),
@@ -50,7 +50,7 @@ function Landing() {
                 transition={{ delay: 0.1 }}
                 className="mt-5 text-lg text-muted-foreground max-w-xl"
               >
-                Follower count is vanity. Trust is currency. Authenfluence AI evaluates whether creator influence is trustworthy, sustainable, and authentic — scoring digital trust from 0 to 100.
+                Follower count is vanity. Trust is currency. Ratefluencer AI evaluates whether creator influence is trustworthy, sustainable, and authentic — scoring digital trust from 0 to 100.
               </motion.p>
 
               <motion.div

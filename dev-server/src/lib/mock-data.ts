@@ -103,6 +103,44 @@ export interface InfluencerAnalysis {
   brandRecommendation?: BrandRecommendation;
   commentAuthenticityDetailed?: DetailedCommentAuthenticity;
   mediaPresence?: VerifiedSocial[];
+  creatorTier?: "Nano" | "Micro" | "Mid-tier" | "Macro" | "Celebrity";
+  influenceScale?: string;
+  marketReach?: string;
+
+  unifiedTrustScore?: number;
+  unifiedTrustExplanation?: string;
+  aiInvestigationSummary?: string;
+  crossPlatformEcosystem?: Array<{
+    platform: string;
+    handle: string;
+    url: string;
+    isVerifiedData: boolean;
+    followers: number;
+    followersLabel: string;
+    engagementRate: number;
+    engagementLabel: string;
+    trustScore: number;
+    botLikelihood: number;
+    postingConsistency: string;
+    reachTier: string;
+  }>;
+  audiencePsychology?: {
+    type: string;
+    behavior: string;
+    demographics?: string;
+    sentiments?: string;
+    retention?: string;
+    personality?: string;
+    interests?: string[];
+    loyaltyScore?: number;
+    fandomIntensity?: number;
+    purchasingIntent?: string;
+  };
+  crossPlatformRisks?: Array<{
+    title: string;
+    severity: "low" | "medium" | "high";
+    description: string;
+  }>;
 
   // ML & business intelligence extension fields
   growthPotentialScore?: number;
@@ -134,6 +172,15 @@ export interface InfluencerAnalysis {
   };
   ecosystemNodes?: Array<{ name: string; type: string; overlapPct: number }>;
   intelligenceFeed?: string[];
+  
+  // Real-time Twitter/X and Fallback attributes
+  bannerUrl?: string;
+  followingCount?: number;
+  bio?: string;
+  location?: string;
+  createdAt?: string;
+  websiteUrl?: string;
+  fallbackReason?: string;
 }
 
 const series = (base: number, vol: number) =>
@@ -565,12 +612,34 @@ export function analyzeMock(username: string): InfluencerAnalysis {
   const avgLikes = isPredefined ? baseObj.avgLikes : 1_000 + (seed * 53) % 30_000;
   const engRate = isPredefined ? (baseObj.engagementRate || 1.5) : ((avgLikes / Math.max(1, followers)) * 100);
 
-  // Infer tier for benchmark context
-  const tier =
-    followers < 10_000 ? "nano" :
-    followers < 100_000 ? "micro" :
-    followers < 1_000_000 ? "mid" :
-    followers < 10_000_000 ? "macro" : "mega";
+  // Infer tier for benchmark context and store metadata
+  let creatorTier: "Nano" | "Micro" | "Mid-tier" | "Macro" | "Celebrity" = "Nano";
+  let influenceScale = "";
+  let marketReach = "";
+  
+  if (followers < 10_000) {
+    creatorTier = "Nano";
+    influenceScale = "Hyper-Local Scale";
+    marketReach = "Highly Targeted Niche";
+  } else if (followers < 100_000) {
+    creatorTier = "Micro";
+    influenceScale = "Niche Community Scale";
+    marketReach = "Targeted Vertical Niche";
+  } else if (followers < 1_000_000) {
+    creatorTier = "Mid-tier";
+    influenceScale = "Regional Scale";
+    marketReach = "Broad Vertical Category Reach";
+  } else if (followers < 10_000_000) {
+    creatorTier = "Macro";
+    influenceScale = "National Scale";
+    marketReach = "Broad Consumer Reach";
+  } else {
+    creatorTier = "Celebrity";
+    influenceScale = "Global Scale";
+    marketReach = "Mass-Market Global Reach";
+  }
+
+  const tier = creatorTier === "Celebrity" ? "mega" : creatorTier === "Macro" ? "macro" : creatorTier === "Mid-tier" ? "mid" : creatorTier === "Micro" ? "micro" : "nano";
 
   const tierBenchmarks: Record<string, number> = {
     nano: 6.0, micro: 4.5, mid: 3.0, macro: 1.8, mega: 0.8,
@@ -616,18 +685,70 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     }
   ];
 
-  const brandRecommendation = isPredefined && baseObj.brandRecommendation ? baseObj.brandRecommendation : {
-    riskLevel: isHigh ? ("Low" as const) : isMed ? ("Medium" as const) : ("Critical" as const),
-    sponsorshipSuitability: isHigh 
-      ? "Highly suitable for long-term sponsorships and premium brand integrations." 
+  let sponsorshipSuitability = "Suitable for standard campaigns";
+  let safetyEvaluation = "Standard due diligence checks advised.";
+
+  if (creatorTier === "Celebrity") {
+    sponsorshipSuitability = isHigh 
+      ? "Highly recommended for mass-market enterprise campaigns and global brand ambassador roles." 
       : isMed 
-        ? "Recommended for short-term or performance-tracked campaigns only." 
-        : "Not recommended for brand campaigns. Independent verification advised.",
-    safetyEvaluation: isHigh 
-      ? "Excellent brand safety alignment with healthy organic comment sentiment." 
+        ? "Suitable for broad reach campaigns with active budget guardrails." 
+        : "Critical risk. High premium ad-spend dilution risk.";
+    safetyEvaluation = isHigh 
+      ? "Exceptional brand safety alignment with clean global sentiment." 
+      : isMed 
+        ? "Standard global safety checks complete. Normal celebrity passive audience." 
+        : "High brand safety risk. Suspicious synthetic activity detected at celebrity scale.";
+  } else if (creatorTier === "Macro") {
+    sponsorshipSuitability = isHigh 
+      ? "Highly suitable for national brand integrations, co-branding, and product launches." 
+      : isMed 
+        ? "Recommended for standard category-focused integrations with performance tracking." 
+        : "Not recommended. High risk of synthetic reach and inorganic engagement spikes.";
+    safetyEvaluation = isHigh 
+      ? "Strong brand safety alignment with healthy organic comment sentiment." 
       : isMed 
         ? "Standard brand safety alignment with standard minor risk patterns." 
-        : "High brand safety risk due to synthetic traffic indicators and bot repetition.",
+        : "Significant brand safety warning. Coordinated commenter pods detected.";
+  } else if (creatorTier === "Mid-tier") {
+    sponsorshipSuitability = isHigh 
+      ? "Highly suitable for vertical niche partnerships, sponsorships, and product reviews." 
+      : isMed 
+        ? "Suitable for mid-funnel integrations with direct response tracking." 
+        : "High risk. High vanity metrics discount recommended.";
+    safetyEvaluation = isHigh 
+      ? "Clean brand safety profile with active category community discussions." 
+      : isMed 
+        ? "Standard safety checks passed. Moderate posting cadence risks." 
+        : "High risk due to suspicious view-to-subscriber velocity anomalies.";
+  } else if (creatorTier === "Micro") {
+    sponsorshipSuitability = isHigh 
+      ? "Exceptional suitability for high-engagement direct response campaigns and affiliate setups." 
+      : isMed 
+        ? "Suitable for community-focused marketing and minor placements." 
+        : "High bot ratio detected. Campaign suitability low.";
+    safetyEvaluation = isHigh 
+      ? "Excellent brand safety. Strong micro-community sentiment." 
+      : isMed 
+        ? "Standard safety index. Minor automated chat signatures." 
+        : "Critical safety warnings due to coordinate engagement networks.";
+  } else {
+    sponsorshipSuitability = isHigh 
+      ? "Ideal for hyper-targeted community advocacy, organic trials, and niche conversion programs." 
+      : isMed 
+        ? "Suitable for micro-affiliate testing." 
+        : "Avoid partnership. Synthetic engagement pod activity suspected.";
+    safetyEvaluation = isHigh 
+      ? "Very high organic safety index with raw personal trust." 
+      : isMed 
+        ? "Standard organic trust. Some repetitive fan clustering." 
+        : "Low organic trust. Suspicious engagement pod presence.";
+  }
+
+  const brandRecommendation = isPredefined && baseObj.brandRecommendation ? baseObj.brandRecommendation : {
+    riskLevel: isHigh ? ("Low" as const) : isMed ? ("Medium" as const) : ("Critical" as const),
+    sponsorshipSuitability,
+    safetyEvaluation,
     reason: isHigh 
       ? "High comment authenticity and organic reach support a reliable partnerships footprint." 
       : isMed 
@@ -736,8 +857,66 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     monitoring: score >= 70
       ? ["Standard category audience growth limits"]
       : score >= 50
-        ? ["Slightly elevated bot language ratios", "Plateauing subscriber velocity"]
-        : ["High spam/bot ratios in comment sections", "Volatile upload consistency", "Likes-to-views conversion mismatch"]
+        ? ["Slightly elevated bot language ratios", "Plateauing subscriber base"]
+        : ["High spam ratio profiles", "Low engagement stability indicators"]
+  };
+
+  let tierVerdict = "";
+  if (score >= 70) {
+    if (creatorTier === "Celebrity") {
+      tierVerdict = `Based on enterprise-scale metrics, this celebrity creator commands global reach with exceptionally stable audience retention. Engagement rate of ${engRate.toFixed(2)}% is highly optimal for celebrity benchmarks (target: ${engTarget}%). Audience quality is verified, confirming clean mass-market brand-fit suitability with very low risk.`;
+    } else if (creatorTier === "Macro") {
+      tierVerdict = `Based on macro-tier metrics, this creator demonstrates national category authority. Engagement rate of ${engRate.toFixed(2)}% is above the benchmark target of ${engTarget}%. Low coordinated bot chatter confirms a highly motivated and clean subscriber footprint suitable for premium campaigns.`;
+    } else if (creatorTier === "Mid-tier") {
+      tierVerdict = `Based on mid-tier metrics, this creator maintains a strong regional category presence. Engagement rate of ${engRate.toFixed(2)}% is highly competitive against the category average (benchmark: ${engTarget}%). Authentic comment depth supports strong audience trust and robust conversion potential.`;
+    } else if (creatorTier === "Micro") {
+      tierVerdict = `Based on micro-tier metrics, this creator shows deep community-level trust. High relative engagement rate of ${engRate.toFixed(2)}% (exceeding the target of ${engTarget}%) indicates an active and highly responsive niche follower base with raw organic advocacy.`;
+    } else {
+      tierVerdict = `Based on nano-tier metrics, this emerging creator displays exceptional micro-community organic trust. Engagement rate of ${engRate.toFixed(2)}% (well above the target of ${engTarget}%) suggests an extremely high-loyalty, conversational audience base ideal for micro-conversions.`;
+    }
+  } else if (score >= 45) {
+    if (creatorTier === "Celebrity") {
+      tierVerdict = `Celebrity-tier profile shows mixed audience interaction indicators. While subscriber reach is globally significant, the engagement rate of ${engRate.toFixed(2)}% is borderline compared to the benchmark of ${engTarget}%. Brand safety is stable, but standard audience verification is advised.`;
+    } else {
+      tierVerdict = `Based on available signals, this ${creatorTier.toLowerCase()} creator shows moderate authenticity. Engagement rate of ${engRate.toFixed(2)}% is near the benchmark of ${engTarget}%, but minor comment repetition warrants standard performance tracking.`;
+    }
+  } else {
+    if (creatorTier === "Celebrity") {
+      tierVerdict = `Celebrity-scale account shows multiple high-risk indicators. Broad mass-market engagement is heavily diluted, falling below the ${engTarget}% benchmark (measured: ${engRate.toFixed(2)}%). Elevated synthetic commenting pods are suspected; independent verification is strongly recommended.`;
+    } else {
+      tierVerdict = `Based on available signals, this ${creatorTier.toLowerCase()} creator presents concerning indicators. Engagement rate of ${engRate.toFixed(2)}% falls below the benchmark of ${engTarget}%, with low organic commenting and elevated risk patterns.`;
+    }
+  }
+
+  let tierRoiExplanation = "";
+  if (score >= 75) {
+    if (creatorTier === "Celebrity") {
+      tierRoiExplanation = "High enterprise yield expected: Mass brand awareness and global conversion velocity driven by top-tier creator authority.";
+    } else if (creatorTier === "Nano" || creatorTier === "Micro") {
+      tierRoiExplanation = "Exceptional niche yield: Hyper-focused audience interest drives high conversion percentages relative to small ad-spend buy-ins.";
+    } else {
+      tierRoiExplanation = "Strong partnership yield: Reliable conversion potential for target vertical campaigns due to consistent organic comment activity.";
+    }
+  } else if (score >= 45) {
+    tierRoiExplanation = "Moderate partnership yield: Balanced conversion rates with standard campaign guardrails and performance-tracked parameters recommended.";
+  } else {
+    tierRoiExplanation = "Low partnership yield: High risk of ad-spend dilution due to vanity follower counts and synthetic engagement chat patterns.";
+  }
+
+  let tierBusinessImpact = {
+    conversionPotential: score >= 75 ? (creatorTier === "Nano" || creatorTier === "Micro" ? "Exceptional (High Affinity)" : "High") : score >= 50 ? "Medium" : "Low",
+    suitability: score >= 75 
+      ? (creatorTier === "Celebrity" ? "Highly suitable for global enterprise awareness campaigns." : "Highly suitable for targeted niche integrations.")
+      : score >= 50 ? "Suitable for performance-based campaigns with strict conversion goals." 
+      : "Not recommended due to synthetic traffic risk.",
+    stability: score >= 70 
+      ? (creatorTier === "Celebrity" ? "High publishing stability with established global footprint." : "Stable publishing cadence with predictable vertical reach.")
+      : score >= 45 ? "Moderate publishing volatility with periodic gaps." 
+      : "High risk of channel stagnation or audience decay.",
+    loyalty: score >= 75 
+      ? (creatorTier === "Nano" || creatorTier === "Micro" ? "Exceptional micro-community loyalty with active organic chatter." : "High celebrity conversational loyalty with low relative bot noise.")
+      : score >= 50 ? "Average viewer retention with typical spam ratios." 
+      : "Weak audience relationship, dominated by automated chatter."
   };
 
   return {
@@ -750,6 +929,9 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     totalPosts: isPredefined ? baseObj.totalPosts : 40 + (seed % 250),
     score,
     isVerified: isPredefined ? baseObj.isVerified : followers >= 1_000_000,
+    creatorTier,
+    influenceScale,
+    marketReach,
     breakdown: {
       engagement: wiggle(1),
       followerQuality: wiggle(2),
@@ -757,12 +939,7 @@ export function analyzeMock(username: string): InfluencerAnalysis {
       postingConsistency: wiggle(4),
       contextualSignals: wiggle(5),
     },
-    verdict: isPredefined && baseObj.verdict ? baseObj.verdict :
-      score >= 70
-        ? `Based on available signals, this creator demonstrates predominantly organic engagement with healthy audience interaction and consistent posting behavior. Engagement rate of ${engRate.toFixed(2)}% is within the expected range for a ${tier}-tier creator (benchmark: ${engTarget}%). Trust signals are strong across most measured dimensions, though some data limitations apply as noted below.`
-        : score >= 45
-          ? `Based on available signals, this creator shows mixed authenticity indicators. Engagement rate of ${engRate.toFixed(2)}% is near the ${tier}-tier benchmark of ${engTarget}%, but several dimensions show inconsistencies that warrant monitoring. With medium confidence, this channel may be suitable for performance-tracked campaigns.`
-          : `Based on available signals, this creator presents multiple concerning indicators. Engagement rate of ${engRate.toFixed(2)}% falls below the ${tier}-tier benchmark of ${engTarget}%, and audience quality signals are weak. With the available data, independent verification is recommended before brand partnership commitments.`,
+    verdict: isPredefined && baseObj.verdict ? baseObj.verdict : tierVerdict,
     fraudSignals: isPredefined && baseObj.fraudSignals ? baseObj.fraudSignals :
       score >= 70
         ? [{ id: "1", title: "Minor Engagement Variance", description: "Within acceptable range for this creator tier and content type.", severity: "low" }]
@@ -813,9 +990,9 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     brandMatches,
     featureAnalysis,
     momentumSignals,
-    businessImpact,
+    businessImpact: isPredefined && baseObj.businessImpact ? baseObj.businessImpact : tierBusinessImpact,
     whyThisScore,
-
+ 
     // Velocity, Virality & Future Impact Engines (v3 Upgrade)
     influenceVelocity: isPredefined ? (baseObj.influenceVelocity || Math.max(10, Math.min(99, Math.round(score * 0.95 + (seed % 10))))) : Math.max(10, Math.min(99, Math.round(score * 0.95 + (seed % 10)))),
     influenceVelocityExplanation: score >= 75
@@ -832,11 +1009,7 @@ export function analyzeMock(username: string): InfluencerAnalysis {
     viralityPotential: isPredefined ? (baseObj.viralityPotential || Math.max(15, Math.min(98, Math.round(score * 0.88 + (seed % 12))))) : Math.max(15, Math.min(98, Math.round(score * 0.88 + (seed % 12)))),
     projectedGrowth90Days: isPredefined ? (baseObj.projectedGrowth90Days || (score >= 70 ? 22 : score >= 50 ? 8 : -2)) : (score >= 70 ? 20 : score >= 50 ? 7 : -3),
     estimatedRoiTier: isPredefined ? (baseObj.estimatedRoiTier || (score >= 75 ? "High" : score >= 50 ? "Medium" : "Low")) : (score >= 75 ? "High" : score >= 50 ? "Medium" : "Low"),
-    roiExplanation: score >= 75 
-      ? "High partnership yield expected: Strong conversion potential for target content campaigns due to high comment authenticity." 
-      : score >= 45 
-        ? "Moderate partnership yield: Balanced conversion rates with standard campaign tracking recommended." 
-        : "Low partnership yield: High coordination and vanity metrics dilution risk.",
+    roiExplanation: isPredefined && baseObj.roiExplanation ? baseObj.roiExplanation : tierRoiExplanation,
     radarMetrics: isPredefined && baseObj.radarMetrics ? baseObj.radarMetrics : {
       engagementAccel: Math.max(10, Math.min(100, Math.round(score * 0.95 + (seed % 8)))),
       audienceAccel: Math.max(10, Math.min(100, Math.round(score * 0.91 + (seed % 10)))),

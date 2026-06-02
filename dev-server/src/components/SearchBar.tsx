@@ -19,17 +19,20 @@ export function SearchBar({ onAnalyze, defaultValue = "" }: { onAnalyze: (u: str
       <div className="flex flex-wrap gap-2 mb-4">
         {[
           { id: "youtube", Icon: Youtube, label: "YouTube" },
-          { id: "instagram", Icon: Instagram, label: "Instagram" },
-          { id: "twitter", Icon: Twitter, label: "Twitter / X" },
+          { id: "instagram", Icon: Instagram, label: "Instagram", disabled: true },
+          { id: "twitter", Icon: Twitter, label: "Twitter / X", disabled: true },
         ].map((p) => (
           <button
             key={p.id}
             type="button"
-            onClick={() => setPlatform(p.id as any)}
+            disabled={p.disabled}
+            onClick={() => !p.disabled && setPlatform(p.id as any)}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition ${
-              platform === p.id
-                ? "border-primary bg-primary/15 text-primary"
-                : "border-border hover:border-primary/40"
+              p.disabled
+                ? "opacity-45 cursor-not-allowed border-border text-muted-foreground"
+                : platform === p.id
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border hover:border-primary/40"
             }`}
           >
             <p.Icon className="w-3.5 h-3.5" />

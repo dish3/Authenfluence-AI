@@ -1,0 +1,160 @@
+/* Fixed Spacing & Spoke-level Styles for HTML-to-Image Export Pipeline */
+
+/* PNG Card container: 2400 x 1350 */
+.dna-export-png-canvas {
+  width: 2400px !important;
+  height: 1350px !important;
+  padding: 80px !important;
+  box-sizing: border-box !important;
+  background-color: #05060a !important;
+  background-image: 
+    radial-gradient(circle at 88% 10%, rgba(151, 47, 255, 0.15), transparent 45%),
+    radial-gradient(circle at 5% 95%, rgba(215, 255, 71, 0.1), transparent 35%) !important;
+  color: #ffffff !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0px !important; /* tight layout */
+}
+
+/* Story Card container: 1080 x 1920 */
+.dna-export-story-canvas {
+  width: 1080px !important;
+  height: 1920px !important;
+  padding: 64px !important;
+  box-sizing: border-box !important;
+  background-color: #05060a !important;
+  background-image: 
+    radial-gradient(circle at 50% 15%, rgba(151, 47, 255, 0.25), transparent 60%),
+    radial-gradient(circle at 50% 85%, rgba(215, 255, 71, 0.15), transparent 60%) !important;
+  color: #ffffff !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+}
+
+/* Grid backgrounds for canvas (static) */
+.dna-export-grid-bg {
+  position: absolute !important;
+  inset: 0 !important;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.009) 1px, transparent 1px) !important;
+  background-size: 40px 40px !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+/* Static Scanline Overlay for retro vibe */
+.dna-export-scanlines {
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%) !important;
+  background-size: 100% 4px !important;
+  pointer-events: none !important;
+  z-index: 5 !important;
+  opacity: 0.3 !important;
+}
+
+/* Static Ticket Base shell */
+.dna-export-ticket-shell {
+  width: 100% !important;
+  height: 560px !important;
+  border-radius: 24px !important;
+  background-color: #090c10 !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  z-index: 2 !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Left & Right large notches */
+.dna-export-large-notch-left {
+  position: absolute !important;
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  background-color: #05060a !important;
+  left: -24px !important;
+  top: 50% !important;
+  margin-top: -24px !important;
+  z-index: 10 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.dna-export-large-notch-right {
+  position: absolute !important;
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  background-color: #05060a !important;
+  right: -24px !important;
+  top: 50% !important;
+  margin-top: -24px !important;
+  z-index: 10 !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Horizontal connector notches & divider */
+.dna-export-horizontal-divider {
+  width: 100% !important;
+  height: 70px !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+  z-index: 3 !important;
+}
+
+.dna-export-mid-notch-left {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  background-color: #05060a !important;
+  margin-left: -20px !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.dna-export-mid-notch-right {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  background-color: #05060a !important;
+  margin-right: -20px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.dna-export-dashed-line {
+  flex-grow: 1 !important;
+  border-top: 2px dashed rgba(255, 255, 255, 0.15) !important;
+  margin: 0 10px !important;
+}
+
+/* Static Barcode Line */
+.dna-export-barcode-line {
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  width: 100% !important;
+  height: 2px !important;
+  background-color: #d7ff47 !important;
+  box-shadow: 0 0 8px #d7ff47 !important;
+  z-index: 3 !important;
+  opacity: 0.8 !important;
+}
+
+/* Static Glow effects */
+.dna-export-glow-purple {
+  box-shadow: 0 0 15px rgba(182, 107, 255, 0.4) !important;
+}
+
+.dna-export-glow-lime {
+  box-shadow: 0 0 15px rgba(215, 255, 71, 0.4) !important;
+}
