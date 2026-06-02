@@ -14,7 +14,7 @@ import {
   LineChart, FileSpreadsheet, History, Settings, Shield, Clock, ChevronRight, AlertCircle, 
   ArrowRight, CheckCircle2, Play, Activity, Sparkles, Heart, FileText, Check, Trophy, BadgeCheck, 
   Minus, RefreshCw, Download, Youtube, Globe, TrendingDown, BarChart3, ThumbsUp, MessageSquare, 
-  DollarSign, ArrowUpRight, Sliders, Database, Share2, Instagram, Twitter
+  DollarSign, ArrowUpRight, Sliders, Database, Share2, Instagram, Twitter, Linkedin, ExternalLink, Info
 } from "lucide-react";
 import { z } from "zod";
 import { ScoreRing } from "@/components/ScoreRing";
@@ -58,6 +58,7 @@ function AnalyzePage() {
 
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [reportType, setReportType] = useState<"full" | "audience" | "brand" | "compare">("full");
   const [includeWatermark, setIncludeWatermark] = useState(true);
   const [historySearch, setHistorySearch] = useState("");
@@ -593,7 +594,7 @@ function AnalyzePage() {
         </div>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="glass rounded-2xl p-4 border border-border/40 relative overflow-hidden">
             <div className="absolute top-2 right-2 text-primary opacity-10"><Shield className="w-8 h-8" /></div>
             <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Total Audits</div>
@@ -623,7 +624,7 @@ function AnalyzePage() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main search and demo creators */}
           <div className="lg:col-span-2 space-y-6">
             <div className="glass rounded-3xl p-6 border border-border/40 space-y-4">
@@ -678,7 +679,7 @@ function AnalyzePage() {
             {/* Top Creators Analyzed */}
             <div className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Top Creators Analyzed</h3>
-              <div className="grid sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {topCreators.map((m) => (
                   <button
                     key={m.username}
@@ -844,34 +845,59 @@ function AnalyzePage() {
 
             {/* Social handles presence */}
             <div className="space-y-2.5 pt-4 border-t border-border/20 text-xs">
-              <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Verified Presence</div>
-              <div className="space-y-2 font-normal">
-                {(result.mediaPresence || [
-                  { platform: "YouTube", url: `https://youtube.com/@${result.username}`, handle: `@${result.username}`, isVerified: true }
-                ]).map((p) => (
-                  <a
-                    key={p.platform}
-                    href={p.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between text-muted-foreground hover:text-foreground transition group"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      {p.platform.toLowerCase() === "youtube" ? (
-                        <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      ) : p.platform.toLowerCase() === "instagram" ? (
-                        <Instagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />
-                      ) : ["twitter", "twitter/x", "x"].includes(p.platform.toLowerCase()) ? (
-                        <Twitter className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                      ) : (
-                        <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      )}
-                      <span>{p.platform}</span>
-                    </span>
-                    <span className="text-[11px] truncate max-w-[120px] font-mono">{p.handle}</span>
-                  </a>
-                ))}
+              <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Globe className="w-3 h-3" /> Verified Presence
               </div>
+              {(() => {
+                const presence = result.mediaPresence || [
+                  { platform: "YouTube", url: `https://youtube.com/@${result.username}`, handle: `@${result.username}`, isVerified: true }
+                ];
+                // Check if we only have YouTube (no external links discovered)
+                const hasExternalLinks = presence.some((p) => p.platform.toLowerCase() !== "youtube");
+
+                const getPlatformIcon = (platform: string) => {
+                  const p = platform.toLowerCase();
+                  if (p === "youtube") return <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />;
+                  if (p === "instagram") return <Instagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />;
+                  if (p === "twitter/x" || p === "twitter" || p === "x") return <Twitter className="w-3.5 h-3.5 text-sky-400 shrink-0" />;
+                  if (p === "facebook") return <span className="w-3.5 h-3.5 shrink-0 text-[10px] font-black text-blue-500">f</span>;
+                  if (p === "tiktok") return <span className="w-3.5 h-3.5 shrink-0 text-[10px] font-black text-foreground">TK</span>;
+                  if (p === "linkedin") return <Linkedin className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
+                  if (p === "discord") return <span className="w-3.5 h-3.5 shrink-0 text-[10px] font-black text-indigo-400">DC</span>;
+                  if (p === "telegram") return <span className="w-3.5 h-3.5 shrink-0 text-[10px] font-black text-sky-400">TG</span>;
+                  if (p === "linktree") return <ExternalLink className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
+                  if (p === "twitch") return <span className="w-3.5 h-3.5 shrink-0 text-[10px] font-black text-purple-500">TV</span>;
+                  return <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />;
+                };
+
+                return (
+                  <>
+                    <div className="space-y-2 font-normal">
+                      {presence.map((p) => (
+                        <a
+                          key={p.platform + p.handle}
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="flex items-center justify-between text-muted-foreground hover:text-foreground transition group"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            {getPlatformIcon(p.platform)}
+                            <span>{p.platform}</span>
+                          </span>
+                          <span className="text-[11px] truncate max-w-[110px] font-mono">{p.handle}</span>
+                        </a>
+                      ))}
+                    </div>
+                    {!hasExternalLinks && (
+                      <div className="flex items-start gap-1.5 mt-2 p-2 rounded-xl bg-muted/10 border border-border/20 text-[10px] text-muted-foreground leading-normal">
+                        <Info className="w-3 h-3 shrink-0 mt-0.5 text-primary/60" />
+                        <span>ℹ️ No verified external creator links discovered.</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -943,9 +969,9 @@ function AnalyzePage() {
         </div>
         {renderCreatorForecastHeader()}
 
-        <div className="grid lg:grid-cols-[220px_1fr] gap-6 items-center glass-strong rounded-3xl p-6 border border-border/40">
+        <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr] gap-6 items-center glass-strong rounded-3xl p-5 sm:p-6 border border-border/40">
           <div className="justify-self-center">
-            <ScoreRing score={result.score} size={200} />
+            <ScoreRing score={result.score} size={180} />
           </div>
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -2218,61 +2244,132 @@ function AnalyzePage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-background animate-fade-in">
-      {/* Left Sidebar Navigation */}
-      <aside className="w-full md:w-64 border-r border-border bg-card/60 backdrop-blur-lg flex flex-col shrink-0">
-        {/* Logo and branding info */}
-        <div className="p-6 border-b border-border flex items-center gap-3">
+  const navItems = [
+    { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
+    { id: "creator", label: "Creator Analysis", Icon: UserCheck },
+    { id: "trust", label: "Trust Intelligence", Icon: ShieldAlert },
+    { id: "growth", label: "Growth Prediction", Icon: TrendingUp },
+    { id: "campaign", label: "Campaign Success", Icon: Target },
+    { id: "brand", label: "Brand Match Engine", Icon: Award },
+    { id: "audience", label: "Audience Insights", Icon: Users },
+    { id: "compare", label: "Creator Comparison", Icon: GitCompare },
+    { id: "trends", label: "Trend Analysis", Icon: LineChart },
+    { id: "reports", label: "Reports & Exports", Icon: FileSpreadsheet },
+    { id: "history", label: "Recent Analyses", Icon: History },
+    { id: "settings", label: "Settings", Icon: Settings },
+  ];
+
+  const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
+    <>
+      {/* Logo and branding info */}
+      <div className="p-5 border-b border-border flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center glow shrink-0">
-            <Shield className="w-4.5 h-4.5 text-white" />
+            <Shield className="w-4 h-4 text-white" />
           </div>
           <div>
             <div className="font-bold text-sm leading-none">Authenfluence AI</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">SaaS Intelligence Console</div>
           </div>
         </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 transition"
+            aria-label="Close menu"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
 
-        {/* Sidebar Nav Items */}
-        <nav className="p-4 flex-1 space-y-1 overflow-y-auto select-none">
-          {[
-            { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
-            { id: "creator", label: "Creator Analysis", Icon: UserCheck },
-            { id: "trust", label: "Trust Intelligence", Icon: ShieldAlert },
-            { id: "growth", label: "Growth Prediction", Icon: TrendingUp },
-            { id: "campaign", label: "Campaign Success", Icon: Target },
-            { id: "brand", label: "Brand Match Engine", Icon: Award },
-            { id: "audience", label: "Audience Insights", Icon: Users },
-            { id: "compare", label: "Creator Comparison", Icon: GitCompare },
-            { id: "trends", label: "Trend Analysis", Icon: LineChart },
-            { id: "reports", label: "Reports & Exports", Icon: FileSpreadsheet },
-            { id: "history", label: "Recent Analyses", Icon: History },
-            { id: "settings", label: "Settings", Icon: Settings },
-          ].map((item) => {
-            const ActiveIcon = item.Icon;
-            const isTabActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition ${
-                  isTabActive
-                    ? "gradient-bg text-white shadow-sm shadow-primary/25"
-                    : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
-                }`}
-              >
-                <ActiveIcon className="w-4 h-4 shrink-0" />
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
+      {/* Sidebar Nav Items */}
+      <nav className="p-3 flex-1 space-y-0.5 overflow-y-auto select-none">
+        {navItems.map((item) => {
+          const ActiveIcon = item.Icon;
+          const isTabActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => { setActiveTab(item.id); onClose?.(); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition ${
+                isTabActive
+                  ? "gradient-bg text-white shadow-sm shadow-primary/25"
+                  : "text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+              }`}
+            >
+              <ActiveIcon className="w-4 h-4 shrink-0" />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen flex bg-background animate-fade-in">
+      {/* Mobile overlay backdrop */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            key="sidebar-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Mobile slide-out sidebar */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.aside
+            key="sidebar-mobile"
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="fixed inset-y-0 left-0 z-50 w-72 border-r border-border bg-card/95 backdrop-blur-xl flex flex-col md:hidden shadow-2xl"
+          >
+            <SidebarContent onClose={() => setSidebarOpen(false)} />
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop static sidebar */}
+      <aside className="hidden md:flex w-64 border-r border-border bg-card/60 backdrop-blur-lg flex-col shrink-0 sticky top-0 h-screen overflow-y-auto">
+        <SidebarContent />
       </aside>
 
       {/* Main page view */}
-      <main className="flex-1 overflow-y-auto bg-background/40">
-        <Nav />
-        <div className="container mx-auto max-w-5xl px-4 sm:px-6 py-8 space-y-6">
+      <main className="flex-1 overflow-y-auto bg-background/40 min-w-0">
+        {/* Mobile top bar with hamburger */}
+        <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 h-14 border-b border-border bg-card/80 backdrop-blur-xl">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30 transition"
+            aria-label="Open menu"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md gradient-bg flex items-center justify-center glow shrink-0">
+              <Shield className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="font-bold text-sm">Authenfluence AI</span>
+          </div>
+          <div className="ml-auto text-[10px] font-semibold text-muted-foreground capitalize truncate">{activeTab}</div>
+        </div>
+        <div className="hidden md:block"><Nav /></div>
+        <div className="container mx-auto max-w-5xl px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6">
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}

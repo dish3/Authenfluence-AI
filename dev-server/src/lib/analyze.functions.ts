@@ -66,7 +66,7 @@ async function runRealAnalysis(
   console.log("RAW INPUT:", input);
 
   try {
-    const { resolveChannel, getChannelSignals, getRecentComments, searchChannelCandidates, normalizeHandle } = await import(
+    const { resolveChannel, getChannelSignals, getRecentComments, searchChannelCandidates, normalizeHandle, extractSocialLinks } = await import(
       "./services/youtube.server"
     );
     const { computeScore, trustLabel, inferCreatorCategories } = await import("./services/scoring");
@@ -141,15 +141,29 @@ async function runRealAnalysis(
 
     const selectedChannel = meta;
     console.log("SELECTED CHANNEL:", selectedChannel);
-
     console.log("LIVE CHANNEL DATA", meta);
     console.log("VIDEO COUNT", meta.totalVideos);
+
+    // ── 1b. Scrape YouTube About page for real external social links ──────────
+    // Run in parallel with channel signal fetching to avoid adding latency.
+    const socialLinksPromise = extractSocialLinks(
+      meta.handle,
+      meta.channelId,
+      `https://www.youtube.com/${meta.handle.startsWith("@") ? meta.handle : "@" + meta.handle.replace(/^@/, "")}`
+    ).catch((err) => {
+      console.warn("[About Page] Social link extraction failed (non-fatal):", err);
+      return [];
+    });
     const titleSeed = [...meta.title.toLowerCase().replace(/[^a-z0-9_\-\.]/g, "")].reduce((a, c) => a + c.charCodeAt(0), 0) || 42;
 
-    // 2. Fetch Channel Signals
-    const raw = await getChannelSignals(meta, apiKey);
+    // 2. Fetch Channel Signals & real social links in parallel
+    const [raw, scrapedSocials] = await Promise.all([
+      getChannelSignals(meta, apiKey),
+      socialLinksPromise,
+    ]);
     console.log("[DEBUG] FETCHED CHANNEL SIGNALS:", {
       recentVideosFetchedCount: raw.recentVideos.length,
+      scrapedSocialsCount: scrapedSocials.length,
     });
 
     // 3. Infer creator categories
@@ -267,9 +281,17 @@ async function runRealAnalysis(
       botLanguagePct: 5,
       organicPct: 75
     };
-    const mediaPresence = aiResponse?.verifiedSocials || [
-      { platform: "YouTube", url: `https://youtube.com/@${meta.handle.replace(/^@/, "")}`, handle: `@${meta.handle.replace(/^@/, "")}`, isVerified: true }
-    ];
+    // ── Use real scraped socials; fall back to Gemini's if scrape returned nothing useful ──
+    // "Useful" = more than just the YouTube entry
+    const scrapedHasExternal = scrapedSocials.length > 1;
+    const mediaPresence = scrapedHasExternal
+      ? scrapedSocials
+      : (aiResponse?.verifiedSocials?.length > 0
+          ? aiResponse.verifiedSocials
+          : [
+              { platform: "YouTube", url: `https://youtube.com/@${meta.handle.replace(/^@/, "")}`, handle: `@${meta.handle.replace(/^@/, "")}`, isVerified: true }
+            ]
+        );
 
     const organicPct = commentAuthenticityDetailed.organicPct;
     const featureAnalysis = [

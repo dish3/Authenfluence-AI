@@ -81,9 +81,21 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-strong rounded-3xl p-6 sm:p-8 ring-glow"
+        className="glass-strong rounded-3xl p-5 sm:p-8 ring-glow"
       >
-        <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_auto] gap-6 sm:gap-8 items-center">
+          {/* Score ring — shown first on mobile, right column on desktop */}
+          <div className="order-first lg:order-last justify-self-center">
+            <div className="sm:hidden">
+              <ScoreRing score={analysis.score} size={160} />
+            </div>
+            <div className="hidden sm:block lg:hidden">
+              <ScoreRing score={analysis.score} size={200} />
+            </div>
+            <div className="hidden lg:block">
+              <ScoreRing score={analysis.score} size={240} />
+            </div>
+          </div>
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {analysis.platform === "instagram" ? (
@@ -148,16 +160,16 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
                   />
                 )}
               </div>
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight flex items-center gap-1.5 flex-wrap">
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight flex items-center gap-1.5 flex-wrap break-words">
                   {analysis.displayName}
                   {analysis.isVerified && (
                     <span title="Verified Creator">
-                      <BadgeCheck className="w-5.5 h-5.5 text-blue-500 fill-blue-500/10 shrink-0 animate-fade-in" />
+                      <BadgeCheck className="w-5 h-5 text-blue-500 fill-blue-500/10 shrink-0 animate-fade-in" />
                     </span>
                   )}
                 </h1>
-                <p className="text-muted-foreground mt-0.5">@{analysis.username}</p>
+                <p className="text-muted-foreground mt-0.5 text-sm sm:text-base">@{analysis.username}</p>
               </div>
             </div>
 
@@ -172,7 +184,7 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4 mt-6 max-w-md">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-5 sm:mt-6 max-w-sm sm:max-w-md">
               {[
                 { Icon: Users, label: "Followers", value: fmt(analysis.followers) },
                 { Icon: Heart, label: "Avg Likes", value: fmt(analysis.avgLikes) },
@@ -199,10 +211,6 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
                 <Button variant="outline"><GitCompare className="w-4 h-4 mr-2" /> Compare</Button>
               </Link>
             </div>
-          </div>
-
-          <div className="justify-self-center">
-            <ScoreRing score={analysis.score} size={240} />
           </div>
         </div>
       </motion.div>
