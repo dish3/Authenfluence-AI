@@ -13,13 +13,15 @@ import { BrandProfitabilityCard } from "@/components/intelligence/BrandProfitabi
 import { CollaborationCard } from "@/components/intelligence/CollaborationCard";
 import { CrossPlatformCard } from "@/components/intelligence/CrossPlatformCard";
 import { DataAvailabilityCard } from "@/components/intelligence/DataAvailabilityCard";
+import CreatorDNACard from "@/components/creator-dna/creator-dna-card";
 import { addHistory, getHistory } from "@/lib/history";
 import { 
   LayoutDashboard, UserCheck, ShieldAlert, TrendingUp, Target, Award, Users, GitCompare, 
   LineChart, FileSpreadsheet, History, Settings, Shield, Clock, ChevronRight, AlertCircle, 
   ArrowRight, CheckCircle2, Play, Activity, Sparkles, Heart, FileText, Check, Trophy, BadgeCheck, 
   Minus, RefreshCw, Download, Youtube, Globe, TrendingDown, BarChart3, ThumbsUp, MessageSquare, 
-  DollarSign, ArrowUpRight, Sliders, Database, Share2, Instagram, Twitter, Send, X, Network, Trash2
+  DollarSign, ArrowUpRight, Sliders, Database, Share2, Instagram, Twitter, Send, X, Network, Trash2,
+  Dna
 } from "lucide-react";
 import { z } from "zod";
 import { ScoreRing } from "@/components/ScoreRing";
@@ -781,9 +783,16 @@ function AnalyzePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<InfluencerAnalysis | null>(null);
-  const [recent, setRecent] = useState(getHistory());
+  const [recent, setRecent] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("dashboard");
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setRecent(getHistory());
+  }, []);
   const [reportType, setReportType] = useState<"full" | "audience" | "brand" | "compare">("full");
   const [includeWatermark, setIncludeWatermark] = useState(true);
   const [historySearch, setHistorySearch] = useState("");
@@ -1437,9 +1446,9 @@ const renderAiExecutiveSummaryHero = () => {
 
   const renderDashboard = () => {
     const displayRecent = recent.length > 0 ? recent.slice(0, 3) : [
-      { username: "mrbeast", displayName: "MrBeast", score: 94, category: "Entertainment", timestamp: Date.now() - 3600000 * 2, platform: "youtube" },
-      { username: "justinbieber", displayName: "Justin Bieber", score: 78, category: "Music", timestamp: Date.now() - 3600000 * 5, platform: "youtube" },
-      { username: "cryptokingz", displayName: "CryptoKingz", score: 32, category: "Finance", timestamp: Date.now() - 3600000 * 12, platform: "youtube" }
+      { username: "mrbeast", displayName: "MrBeast", score: 94, category: "Entertainment", timestamp: 1717329600000 - 3600000 * 2, platform: "youtube" },
+      { username: "justinbieber", displayName: "Justin Bieber", score: 78, category: "Music", timestamp: 1717329600000 - 3600000 * 5, platform: "youtube" },
+      { username: "cryptokingz", displayName: "CryptoKingz", score: 32, category: "Finance", timestamp: 1717329600000 - 3600000 * 12, platform: "youtube" }
     ];
 
     const avgTrustScore = recent.length > 0 
@@ -2474,10 +2483,10 @@ const renderAiExecutiveSummaryHero = () => {
 
             <div className="space-y-4">
               {processedMatches.map((match) => {
-                // Simulated breakdown values
-                const nicheAlign = Math.round(match.score * 0.95 + Math.random() * 4);
-                const audCompat = Math.round(match.score * 0.91 + Math.random() * 6);
-                const semanticSim = Math.round(match.score * 0.97 + Math.random() * 3);
+                const pseudoSeed = match.brandName.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                const nicheAlign = Math.round(match.score * 0.95 + (pseudoSeed % 4));
+                const audCompat = Math.round(match.score * 0.91 + (pseudoSeed % 6));
+                const semanticSim = Math.round(match.score * 0.97 + (pseudoSeed % 3));
 
                 const eligLabel = getEligibilityLabel();
                 const compatLabel = getCompatLabel(match.score);
@@ -4370,10 +4379,16 @@ const renderAiExecutiveSummaryHero = () => {
     );
   };
 
+  const renderCreatorDNAPassport = () => {
+    if (!result) return renderAnalyzeFirst("Digital DNA Passport");
+    return <CreatorDNACard analysis={result} />;
+  };
+
   const renderActiveTabContent = () => {
     switch (activeTab) {
       case "dashboard": return renderDashboard();
       case "creator": return renderCreatorAnalysis();
+      case "dna": return renderCreatorDNAPassport();
       case "ecosystem": return renderEcosystemGraph();
       case "media": return renderMediaIntelligence();
       case "trust": return renderTrustIntelligence();
@@ -4411,6 +4426,7 @@ const renderAiExecutiveSummaryHero = () => {
           {[
             { id: "dashboard", label: "Control Center", Icon: LayoutDashboard },
             { id: "creator", label: "Executive Summary", Icon: UserCheck },
+            { id: "dna", label: "Digital DNA Passport", Icon: Dna },
             { id: "trust", label: "Ratefluencer Score™", Icon: ShieldAlert },
             { id: "ecosystem", label: "Ecosystem Discovery", Icon: Globe },
             { id: "media", label: "Media Intelligence", Icon: Network },
