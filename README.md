@@ -1,5 +1,7 @@
 # Authenfluence AI
 
+Prototype Link: https://authenfluence-ai.onrender.com/
+
 Authenfluence AI is a creator trust intelligence platform for brands and agencies. It helps evaluate creator authenticity using YouTube data, engagement patterns, fraud signals, comment quality, and explainable trust scoring.
 
 ## Main Features
