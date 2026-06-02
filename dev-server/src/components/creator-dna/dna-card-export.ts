@@ -22,7 +22,6 @@ export async function downloadPNG(elementId: string, filename = "card.png") {
     const dataUrl = await toPng(el, {
       pixelRatio: 3,
       cacheBust: true,
-      useCORS: true,
       backgroundColor: '#05060a',
       width: 2400,
       height: 1350,
@@ -55,7 +54,6 @@ export async function downloadPDF(elementId: string, filename = 'card.pdf', anal
     const dataUrl = await toPng(el, {
       pixelRatio: 3,
       cacheBust: true,
-      useCORS: true,
       backgroundColor: '#05060a',
       width: 2400,
       height: 1350,
@@ -207,7 +205,6 @@ export async function downloadStory(elementId: string, filename = 'creator-story
     const dataUrl = await toPng(el, {
       pixelRatio: 3,
       cacheBust: true,
-      useCORS: true,
       backgroundColor: '#05060a',
       width: 1080,
       height: 1920,

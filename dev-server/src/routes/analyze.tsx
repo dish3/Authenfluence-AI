@@ -1445,13 +1445,13 @@ const renderAiExecutiveSummaryHero = () => {
   };
 
   const renderDashboard = () => {
-    const displayRecent = recent.length > 0 ? recent.slice(0, 3) : [
+    const displayRecent = (mounted && recent.length > 0) ? recent.slice(0, 3) : [
       { username: "mrbeast", displayName: "MrBeast", score: 94, category: "Entertainment", timestamp: 1717329600000 - 3600000 * 2, platform: "youtube" },
       { username: "justinbieber", displayName: "Justin Bieber", score: 78, category: "Music", timestamp: 1717329600000 - 3600000 * 5, platform: "youtube" },
       { username: "cryptokingz", displayName: "CryptoKingz", score: 32, category: "Finance", timestamp: 1717329600000 - 3600000 * 12, platform: "youtube" }
     ];
 
-    const avgTrustScore = recent.length > 0 
+    const avgTrustScore = (mounted && recent.length > 0) 
       ? Math.round(recent.reduce((acc, h) => acc + h.score, 0) / recent.length) 
       : 81;
 
@@ -1543,7 +1543,9 @@ const renderAiExecutiveSummaryHero = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-[10px] text-muted-foreground/60">
-                        {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {mounted
+                          ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : "Audit logged"}
                       </span>
                       <span 
                         className="text-sm font-bold tabular-nums w-8 text-right"
@@ -1761,6 +1763,11 @@ const renderAiExecutiveSummaryHero = () => {
                     <span className="text-[11px] truncate max-w-[120px] font-mono">{p.handle}</span>
                   </a>
                 ))}
+                {(!result.mediaPresence || result.mediaPresence.filter((p: any) => p.platform.toLowerCase() !== "youtube").length === 0) && (
+                  <div className="text-[10px] text-muted-foreground/60 italic py-2 text-center border border-dashed border-border/20 rounded-xl bg-black/10 select-none">
+                    ℹ️ No verified external creator links discovered.
+                  </div>
+                )}
               </div>
             </div>
           </div>

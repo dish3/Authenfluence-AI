@@ -374,13 +374,14 @@ async function fetchYouTubePageHTML(channelId: string, handle: string): Promise<
   const cleanHandle = handle.replace(/^@/, "");
   const urls: string[] = [];
   
+  // Prioritize /about tab candidates first for complete link extraction
   if (cleanHandle) {
-    urls.push(`https://www.youtube.com/@${cleanHandle}`);
     urls.push(`https://www.youtube.com/@${cleanHandle}/about`);
+    urls.push(`https://www.youtube.com/@${cleanHandle}`);
   }
   if (channelId) {
-    urls.push(`https://www.youtube.com/channel/${channelId}`);
     urls.push(`https://www.youtube.com/channel/${channelId}/about`);
+    urls.push(`https://www.youtube.com/channel/${channelId}`);
   }
   
   console.log(`[YouTube Scraper] Fetching channel HTML from candidates:`, urls);
@@ -393,6 +394,7 @@ async function fetchYouTubePageHTML(channelId: string, handle: string): Promise<
   
   for (const url of urls) {
     try {
+      console.log(`[About Page Fetch Started] ${url}`);
       const res = await fetch(url, {
         headers: {
           "User-Agent": userAgents[Math.floor(Math.random() * userAgents.length)],
@@ -402,10 +404,12 @@ async function fetchYouTubePageHTML(channelId: string, handle: string): Promise<
       });
       if (res.ok) {
         const html = await res.text();
-        if (html && (html.includes("ytInitialData") || html.includes("instagram.com") || html.includes("twitter.com"))) {
-          console.log(`[YouTube Scraper] Successfully fetched HTML from ${url} (length: ${html.length})`);
+        console.log(`[About Metadata Loaded] ${res.status} (length: ${html.length})`);
+        if (html && (html.includes("ytInitialData") || html.includes("instagram.com") || html.includes("twitter.com") || html.includes("x.com"))) {
           return html;
         }
+      } else {
+        console.log(`[About Metadata Loaded] Failed to load status: ${res.status}`);
       }
     } catch (err) {
       console.warn(`[YouTube Scraper] Failed to fetch HTML from ${url}:`, err);
@@ -415,15 +419,32 @@ async function fetchYouTubePageHTML(channelId: string, handle: string): Promise<
   return "";
 }
 
+function decodeHtmlLinks(text: string): string {
+  let decoded = text;
+  try {
+    decoded = decodeURIComponent(text);
+  } catch {
+    decoded = text
+      .replace(/%3A/gi, ":")
+      .replace(/%2F/gi, "/")
+      .replace(/%3F/gi, "?")
+      .replace(/%3D/gi, "=")
+      .replace(/%26/gi, "&")
+      .replace(/%25/gi, "%");
+  }
+  return decoded.replace(/\\\/|\\/g, "/");
+}
+
 export function extractSocialLinks(text: string): DiscoveredSocial[] {
   const discovered: DiscoveredSocial[] = [];
   
-  // Replace backslash escaped slashes to handle JSON-encoded URLs in HTML script blocks
-  const unescaped = text.replace(/\\\/|\\/g, "/");
+  // Normalize and decode escaped characters and URL-encoded query redirects
+  const unescaped = decodeHtmlLinks(text);
   
   const urlRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|tiktok\.com|twitter\.com|x\.com|spotify\.com|discord\.gg|discord\.com|twitch\.tv|linktr\.ee|facebook\.com|linkedin\.com)\/[a-zA-Z0-9_\-\.\/@?=&%#]+/gi;
   
   const matches = unescaped.match(urlRegex) || [];
+  console.log(`[External Links Found] Found ${matches.length} matches`);
   
   const platforms = [
     { name: "Instagram", domain: "instagram.com" },
@@ -453,6 +474,7 @@ export function extractSocialLinks(text: string): DiscoveredSocial[] {
     if (!handle) continue;
     
     const cleanUrl = fullUrl.split("?")[0].replace(/\/+$/, "");
+    console.log(`[Platform Classified] ${platformInfo.name}: ${cleanUrl} (handle: ${handle})`);
     
     const hasDup = discovered.some(d => 
       d.platform === platformInfo.name && 
@@ -549,7 +571,7 @@ export async function discoverEcosystemLinks(
   }
   
   const finalSocials = directLinks.filter(d => d.platform !== "Linktree");
-  console.log(`[Ecosystem Discovery] Final discovered socials for ${handle}:`, finalSocials);
+  console.log(`[Verified Socials Generated] ${JSON.stringify(finalSocials)}`);
   return finalSocials;
 }
 
