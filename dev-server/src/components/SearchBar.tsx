@@ -4,40 +4,42 @@ import { Search, Youtube, Instagram, Twitter, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function SearchBar({ onAnalyze, defaultValue = "" }: { onAnalyze: (u: string) => void; defaultValue?: string }) {
+export function SearchBar({ onAnalyze, defaultValue = "" }: { onAnalyze: (u: string, platform: "youtube" | "instagram" | "twitter") => void; defaultValue?: string }) {
   const [value, setValue] = useState(defaultValue);
   const [platform, setPlatform] = useState<"youtube" | "instagram" | "twitter">("youtube");
+
+  const placeholders = {
+    youtube: "Enter YouTube channel handle or ID (try: techwithpriya, cryptokingz, @mrbeast)",
+    instagram: "Enter Instagram username (try: cristiano, selenagomez, taylorswift)",
+    twitter: "Enter Twitter / X handle (try: elonmusk, billgates, mrbeast)"
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-strong rounded-3xl p-5 sm:p-6 ring-glow">
       <div className="flex flex-wrap gap-2 mb-4">
         {[
-          { id: "youtube", Icon: Youtube, label: "YouTube", active: true },
-          { id: "instagram", Icon: Instagram, label: "Instagram", active: false },
-          { id: "twitter", Icon: Twitter, label: "Twitter / X", active: false },
+          { id: "youtube", Icon: Youtube, label: "YouTube" },
+          { id: "instagram", Icon: Instagram, label: "Instagram" },
+          { id: "twitter", Icon: Twitter, label: "Twitter / X" },
         ].map((p) => (
           <button
             key={p.id}
             type="button"
-            onClick={() => p.active && setPlatform(p.id as "youtube")}
-            disabled={!p.active}
+            onClick={() => setPlatform(p.id as any)}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition ${
               platform === p.id
                 ? "border-primary bg-primary/15 text-primary"
-                : p.active
-                  ? "border-border hover:border-primary/40"
-                  : "border-border opacity-50 cursor-not-allowed"
+                : "border-border hover:border-primary/40"
             }`}
           >
             <p.Icon className="w-3.5 h-3.5" />
             {p.label}
-            {!p.active && <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Soon</span>}
           </button>
         ))}
       </div>
 
       <form
-        onSubmit={(e) => { e.preventDefault(); if (value.trim()) onAnalyze(value.trim()); }}
+        onSubmit={(e) => { e.preventDefault(); if (value.trim()) onAnalyze(value.trim(), platform); }}
         className="flex flex-col sm:flex-row gap-2"
       >
         <div className="relative flex-1">
@@ -45,7 +47,7 @@ export function SearchBar({ onAnalyze, defaultValue = "" }: { onAnalyze: (u: str
           <Input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Enter YouTube channel username (try: techwithpriya, foodierohan, cryptokingz)"
+            placeholder={placeholders[platform]}
             className="pl-10 h-12 bg-background/60 border-border focus-visible:ring-primary"
           />
         </div>

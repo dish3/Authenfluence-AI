@@ -3,7 +3,7 @@ import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient(); // Create a new QueryClient instance for each router instance
 
   const router = createRouter({
     routeTree,
