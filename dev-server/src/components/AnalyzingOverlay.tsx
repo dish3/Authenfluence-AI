@@ -1,14 +1,15 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Shield, Activity, Users, Bot, Sparkles, Database, Brain } from "lucide-react";
+import { Shield, Activity, Users, Bot, Sparkles, Database, Brain, TrendingUp } from "lucide-react";
 
 const STAGES = [
   { icon: Database, text: "Fetching Live Creator Data..." },
-  { icon: Users, text: "Analyzing Audience Interaction Patterns..." },
-  { icon: Activity, text: "Evaluating Trust Stability Signals..." },
-  { icon: Shield, text: "Comparing Against Creator Benchmarks..." },
-  { icon: Brain, text: "Generating AI Trust Assessment..." },
-  { icon: Sparkles, text: "Finalizing Contextual Trust Report..." },
+  { icon: Users, text: "Analyzing Audience Interaction..." },
+  { icon: Activity, text: "Evaluating Trust Signals..." },
+  { icon: TrendingUp, text: "Computing Growth Predictions..." },
+  { icon: Sparkles, text: "Running Brand Matching Engine..." },
+  { icon: Brain, text: "Generating AI Campaign Intelligence..." },
+  { icon: Shield, text: "Finalizing Digital Trust Assessment..." },
 ];
 
 export function AnalyzingOverlay({ onDone }: { onDone: () => void }) {
