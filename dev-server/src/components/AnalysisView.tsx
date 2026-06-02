@@ -137,7 +137,7 @@ export function AnalysisView({ analysis }: { analysis: InfluencerAnalysis }) {
                 </div>
                 {isValidAvatar(analysis.avatarUrl) && !imageError && (
                   <img
-                    src={analysis.avatarUrl.startsWith("//") ? `https:${analysis.avatarUrl}` : analysis.avatarUrl}
+                    src={analysis.avatarUrl?.startsWith("//") ? `https:${analysis.avatarUrl}` : analysis.avatarUrl}
                     alt={analysis.displayName}
                     referrerPolicy="no-referrer"
                     onLoad={() => setImageLoaded(true)}

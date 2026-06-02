@@ -48,7 +48,14 @@ function AnalyzePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<InfluencerAnalysis | null>(null);
-  const [recent, setRecent] = useState(getHistory());
+  const [recent, setRecent] = useState<any[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setRecent(getHistory());
+  }, []);
+
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [reportType, setReportType] = useState<"full" | "audience" | "brand" | "compare">("full");
